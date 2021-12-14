@@ -1,0 +1,7 @@
+classifier: false
+coreAddress: "127.0.0.2"
+coreGtpInterface: gtp0
+coreAction: forward
+accessAddress: "127.0.0.3"
+accessGtpInterface: gtp1
+accessAction: decap
