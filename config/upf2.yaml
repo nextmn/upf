@@ -1,7 +1,15 @@
-classifier: false
-coreAddress: "127.0.0.2"
-coreGtpInterface: gtp0
-coreAction: forward
-accessAddress: "127.0.0.3"
-accessGtpInterface: gtp1
-accessAction: decap
+entities:
+  - ipAddress: "10.0.10.3" 
+    pdrs:
+      - teid: 1
+        far:
+          - teid: 2
+            gtpuPeer: "10.0.20.2"
+      - teid: 3
+        far:
+          - teid: 4
+            gtpuPeer: "10.0.30.2"
+
+  - ipAddress: "10.0.20.3" 
+  - ipAddress: "10.0.30.3" 
+ipEndpoints:

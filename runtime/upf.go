@@ -5,90 +5,153 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/exec"
 
-	"github.com/vishvananda/netlink"
-
+	"github.com/songgao/water"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
 )
 
 var Upf *UpfConfig
-var uConnAccess *gtpv1.UPlaneConn
-var uConnCore *gtpv1.UPlaneConn
+var ipInterface *water.Interface
 
-func PrintAddresses() error {
-	fmt.Println("AccessAddress: ", Upf.AccessAddress)
-	fmt.Println("CoreAddress: ", Upf.CoreAddress)
-	return nil
-}
-func Run() (err error) {
-	uConnAccess, err = CreateEndpoint(Upf.AccessAddress, Upf.AccessGtpInterface, Upf.AccessAction)
-	if err != nil {
-		return err
+func Run() error {
+	createIPEndpoints()
+	createGtpUProtocolEntities()
+	if len(Upf.IPEndpoints) > 0 {
+		fmt.Println("Starting IP Endpoint")
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// TS 129 281 V16.2.0, section 4.4.2.0:
+		// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
+		// Port or the Flow Label field (see IETF RFC 6437 [37]) should be set dynamically by the sending GTP-U entity to help
+		// balancing the load in the transport network.
+		laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:0", Upf.IPEndpoints[0].LocalAddr))
+		if err != nil {
+			log.Println("Error while resolving local UPD address for client", err)
+			return err
+		}
+		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", Upf.IPEndpoints[0].GTPUPeer, "2152"))
+		if err != nil {
+			log.Println("Error while resolving UDP address of GTP-U Peer")
+			return err
+		}
+		uConn, err := gtpv1.DialUPlane(ctx, laddr, raddr)
+		defer uConn.Close()
+		for {
+			packet := make([]byte, 1500)
+			n, err := ipInterface.Read(packet)
+			if err != nil {
+				return err
+			}
+			if _, err := uConn.WriteToGTP(Upf.IPEndpoints[0].TEID, packet[:n], raddr); err != nil {
+				log.Println("Error while sending GTP packet")
+				return err
+			}
+		}
+		return nil
+	} else {
+		fmt.Println("Not starting IP Endpoint")
+		for {
+		}
+		return nil
 	}
-	uConnCore, err = CreateEndpoint(Upf.CoreAddress, Upf.CoreGtpInterface, Upf.CoreAction)
-	if err != nil {
-		return err
-	}
-	for {
-	}
-	return nil
 }
 
-func TPDUHandler(addr string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
-	fmt.Println("TEID received on addr", addr, ":", msg.TEID())
-	return nil
-}
-
-func CreateEndpoint(address string, iface string, action string) (uConn *gtpv1.UPlaneConn, err error) {
-	if action != "forward" {
-		return nil, nil
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	accessAddress, err := net.ResolveUDPAddr("udp", address+gtpv1.GTPUPort)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	uConn = gtpv1.NewUPlaneConn(accessAddress)
-	if err != nil {
-		fmt.Println("Error binding access-address")
-		return
-	}
-	defer uConn.Close()
-	if Upf.KernelRouting {
-		if err = uConn.EnableKernelGTP(iface, gtpv1.RoleSGSN); err != nil {
-			fmt.Println("Error enabling kernel gtp: ", err)
-			fmt.Println("You must enable CAP_NET_ADMIN to run the program.")
-			return
+func createIPEndpoints() error {
+	if len(Upf.IPEndpoints) > 0 {
+		err := createTun()
+		if err != nil {
+			return err
 		}
 	}
-	if err = uConn.ListenAndServe(ctx); err != nil {
-		fmt.Println("Error listen and serve")
-		return
-	}
-	uConn.AddHandler(message.MsgTypeTPDU, func(c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
-		return TPDUHandler(address, c, senderAddr, msg)
-	})
-	return uConn, nil
+	return nil
 }
 
-func RemoveUconnLink(uConn *gtpv1.UPlaneConn) error {
-	if !Upf.KernelRouting {
-		return nil
-	}
-	if uConn == nil {
-		return nil
-	}
-	if err := netlink.LinkDel(uConn.KernelGTP.Link); err != nil {
-		return fmt.Errorf("Failed to remove link %s: %w", uConn.KernelGTP.Link.Name, err)
+func createGtpUProtocolEntities() error {
+	for _, v := range Upf.GTPUProtocolEntities {
+		go createGtpUProtocolEntity(v)
 	}
 	return nil
+}
 
+func tpduHandler(addr string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
+	fmt.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", addr)
+	return nil
+}
+
+func createGtpUProtocolEntity(entity *GTPUProtocolEntity) error {
+	fmt.Println("Creating new GTP-U Protocol Entity")
+	laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", entity.IpAddress, "2152"))
+	if err != nil {
+		fmt.Println("Error while resolving UDP address of local GTP entity")
+		return err
+	}
+	uConn := gtpv1.NewUPlaneConn(laddr)
+	defer uConn.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	uConn.DisableErrorIndication()
+	uConn.AddHandler(message.MsgTypeTPDU, func(c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
+		return tpduHandler(entity.IpAddress, c, senderAddr, msg)
+	})
+	if err := uConn.ListenAndServe(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 func Exit() error {
-	RemoveUconnLink(uConnAccess)
-	RemoveUconnLink(uConnCore)
+	if len(Upf.IPEndpoints) > 0 {
+		removeTun()
+	}
+	return nil
+}
+
+func runIP(args ...string) error {
+	cmd := exec.Command("ip", args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	err := cmd.Run()
+	if nil != err {
+		errLog := fmt.Sprintf("Error running %s: %s", cmd.Args[0], err)
+		log.Println(errLog)
+		return err
+	}
+	return nil
+}
+
+func removeTun() error {
+	err := runIP("link", "del", ipInterface.Name())
+	if nil != err {
+		log.Println("Unable to delete interface ", ipInterface.Name(), ":", err)
+		return err
+	}
+	return nil
+}
+
+func createTun() error {
+	config := water.Config{
+		DeviceType: water.TUN,
+	}
+	iface, err := water.New(config)
+	if nil != err {
+		log.Println("Unable to allocate TUN interface:", err)
+		return err
+	}
+	runIP("link", "set", "dev", iface.Name(), "mtu", "1400")
+	if nil != err {
+		log.Println("Unable to set MTU for", iface.Name())
+		return err
+	}
+	runIP("link", "set", "dev", iface.Name(), "up")
+	if nil != err {
+		log.Println("Unable to set", iface.Name(), "up")
+		return err
+	}
+
+	ipInterface = iface
 	return nil
 }
