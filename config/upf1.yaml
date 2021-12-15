@@ -2,5 +2,5 @@ entities:
   - ipAddress: "10.0.10.2"
 ipEndpoints:
   - gtpuPeer: "10.0.10.3"
-    TEID: 1
+    teid: 1
     laddr: "10.0.10.2"

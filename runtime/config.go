@@ -21,6 +21,7 @@ func ParseConf(file string) error {
 }
 
 type PDR struct {
+	ID    uint32 `yaml:"id"`
 	TEID  uint32 `yaml:"teid"`
 	FARID uint32 `yaml:"farid"`
 }
