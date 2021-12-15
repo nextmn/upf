@@ -19,20 +19,40 @@ var ipInterface *water.Interface
 func Run() error {
 	createIPEndpoints()
 	createGtpUProtocolEntities()
+	for {
+	}
+	return nil
+}
+
+func createIPEndpoints() error {
 	if len(Upf.IPEndpoints) > 0 {
-		fmt.Println("Starting IP Endpoint")
+		err := createIPEndpoint(Upf.IPEndpoints[0])
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func createIPEndpoint(endpoint *IPEndpoint) error {
+	err := createTun()
+	if err != nil {
+		return err
+	}
+	go func() error {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		// TS 129 281 V16.2.0, section 4.4.2.0:
 		// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
 		// Port or the Flow Label field (see IETF RFC 6437 [37]) should be set dynamically by the sending GTP-U entity to help
 		// balancing the load in the transport network.
-		laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:0", Upf.IPEndpoints[0].LocalAddr))
+		laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:0", endpoint.LocalAddr))
 		if err != nil {
 			log.Println("Error while resolving local UPD address for client", err)
 			return err
 		}
-		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", Upf.IPEndpoints[0].GTPUPeer, "2152"))
+		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", endpoint.GTPUPeer, "2152"))
 		if err != nil {
 			log.Println("Error while resolving UDP address of GTP-U Peer")
 			return err
@@ -40,7 +60,7 @@ func Run() error {
 		uConn, err := gtpv1.DialUPlane(ctx, laddr, raddr)
 		defer uConn.Close()
 		for {
-			packet := make([]byte, 1500)
+			packet := make([]byte, 1400)
 			n, err := ipInterface.Read(packet)
 			if err != nil {
 				return err
@@ -51,21 +71,7 @@ func Run() error {
 			}
 		}
 		return nil
-	} else {
-		fmt.Println("Not starting IP Endpoint")
-		for {
-		}
-		return nil
-	}
-}
-
-func createIPEndpoints() error {
-	if len(Upf.IPEndpoints) > 0 {
-		err := createTun()
-		if err != nil {
-			return err
-		}
-	}
+	}()
 	return nil
 }
 
