@@ -7,6 +7,8 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sort"
+	"strings"
 
 	"github.com/songgao/water"
 	"github.com/wmnsk/go-gtp/gtpv1"
@@ -14,61 +16,48 @@ import (
 )
 
 var Upf *UpfConfig
-var ipInterface *water.Interface
+var TUNInterface *water.Interface
 
 func Run() error {
-	createIPEndpoints()
+	createPFCPNode()
+	createTUNInterface()
 	createGtpUProtocolEntities()
 	for {
+		select {}
 	}
 	return nil
 }
 
-func createIPEndpoints() error {
-	if len(Upf.IPEndpoints) > 0 {
-		err := createIPEndpoint(Upf.IPEndpoints[0])
-		if err != nil {
-			return err
+func createPFCPNode() error {
+	log.Println("Creating PFCP sessions from config file")
+	log.Println("Generating initial sort for PDRs of PFCP sessions")
+	for _, session := range Upf.PFCPSessions {
+		sort.Sort(PDRs(session.PDRS))
+	}
+	go func() error {
+		for {
+			select {}
 		}
-
-	}
+		// TODO: to add a real PFCP server, at each PDR added we need to sort PDRs of the current session
+		return nil
+	}()
 	return nil
 }
 
-func createIPEndpoint(endpoint *IPEndpoint) error {
+func createTUNInterface() error {
 	err := createTun()
 	if err != nil {
 		return err
 	}
 	go func() error {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		// TS 129 281 V16.2.0, section 4.4.2.0:
-		// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
-		// Port or the Flow Label field (see IETF RFC 6437 [37]) should be set dynamically by the sending GTP-U entity to help
-		// balancing the load in the transport network.
-		laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:0", endpoint.LocalAddr))
-		if err != nil {
-			log.Println("Error while resolving local UPD address for client", err)
-			return err
-		}
-		raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", endpoint.GTPUPeer, "2152"))
-		if err != nil {
-			log.Println("Error while resolving UDP address of GTP-U Peer")
-			return err
-		}
-		uConn, err := gtpv1.DialUPlane(ctx, laddr, raddr)
-		defer uConn.Close()
+
 		for {
 			packet := make([]byte, 1400)
-			n, err := ipInterface.Read(packet)
+			n, err := TUNInterface.Read(packet)
 			if err != nil {
 				return err
 			}
-			if _, err := uConn.WriteToGTP(endpoint.TEID, packet[:n], raddr); err != nil {
-				log.Println("Error while sending GTP packet")
-				return err
-			}
+			go ipPacketHandler(packet[:n])
 		}
 		return nil
 	}()
@@ -82,52 +71,16 @@ func createGtpUProtocolEntities() error {
 	return nil
 }
 
-func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, PDRs []*PDR, FARs []*FAR) error {
-	fmt.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
-	pdr, err := findPDR(PDRs, msg.TEID())
-	if err != nil {
-		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
-		return err
-	}
-	far, err := getFAR(FARs, pdr)
-	if err != nil {
-		log.Println("Could not find FAR associated with PDR", pdr.ID)
-	}
-	fmt.Println("Forwarding to GTP-U Peer", far.GTPUPeer, "with TEID", far.TEID)
-	packet := make([]byte, 1500)
-	msg.MarshalTo(packet)
-	tpdu, err := message.ParseTPDU(packet[:msg.MarshalLen()])
-	if err != nil {
-		return err
-	}
-	gpdu := message.NewTPDU(far.TEID, tpdu.Decapsulate())
-	fmt.Printf("[% x]", gpdu)
-	//TODO: forward packet
-	return nil
-}
-
-func findPDR(PDRs []*PDR, teid uint32) (pdr *PDR, err error) {
-	for _, pdr := range PDRs {
-		if pdr.TEID == teid {
-			return pdr, nil
-		}
-	}
-	return nil, fmt.Errorf("Could not find PDR for TEID %d", teid)
-
-}
-
-func getFAR(FARs []*FAR, pdr *PDR) (far *FAR, err error) {
-	for _, far := range FARs {
-		if pdr.FARID == far.ID {
-			return far, nil
-		}
-	}
-	return nil, fmt.Errorf("Could not find FAR with id: %d", pdr.FARID)
-}
-
-func createGtpUProtocolEntity(entity *GTPUProtocolEntity) error {
+func createGtpUProtocolEntity(ipAddress string) error {
 	fmt.Println("Creating new GTP-U Protocol Entity")
-	laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", entity.IpAddress, "2152"))
+	gtpuPort := "2152"
+	var udpaddr string
+	if strings.Count(ipAddress, ":") > 0 {
+		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, gtpuPort)
+	} else {
+		udpaddr = fmt.Sprintf("%s:%s", ipAddress, gtpuPort)
+	}
+	laddr, err := net.ResolveUDPAddr("udp", udpaddr)
 	if err != nil {
 		fmt.Println("Error while resolving UDP address of local GTP entity")
 		return err
@@ -138,7 +91,7 @@ func createGtpUProtocolEntity(entity *GTPUProtocolEntity) error {
 	defer cancel()
 	uConn.DisableErrorIndication()
 	uConn.AddHandler(message.MsgTypeTPDU, func(c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
-		return tpduHandler(entity.IpAddress, c, senderAddr, msg, entity.PDRs, entity.FARs)
+		return tpduHandler(ipAddress, c, senderAddr, msg)
 	})
 	if err := uConn.ListenAndServe(ctx); err != nil {
 		return err
@@ -147,9 +100,7 @@ func createGtpUProtocolEntity(entity *GTPUProtocolEntity) error {
 	return nil
 }
 func Exit() error {
-	if len(Upf.IPEndpoints) > 0 {
-		removeTun()
-	}
+	removeTun()
 	return nil
 }
 
@@ -168,9 +119,9 @@ func runIP(args ...string) error {
 }
 
 func removeTun() error {
-	err := runIP("link", "del", ipInterface.Name())
+	err := runIP("link", "del", TUNInterface.Name())
 	if nil != err {
-		log.Println("Unable to delete interface ", ipInterface.Name(), ":", err)
+		log.Println("Unable to delete interface ", TUNInterface.Name(), ":", err)
 		return err
 	}
 	return nil
@@ -196,6 +147,6 @@ func createTun() error {
 		return err
 	}
 
-	ipInterface = iface
+	TUNInterface = iface
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/wmnsk/go-gtp/gtpv1"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,31 +21,64 @@ func ParseConf(file string) error {
 	return nil
 }
 
+type FTEID struct {
+	TEID      uint32 `yaml:"teid"`
+	IPAddress string `yaml:"ipAddress"`
+}
+type PDI struct {
+	SourceInterface string `yaml:"sourceInterface"`
+	FTEID           *FTEID `yaml:"fteid,omitempty"` // not required if source is not encapsulated
+}
+
 type PDR struct {
-	ID    uint32 `yaml:"id"`
-	TEID  uint32 `yaml:"teid"`
-	FARID uint32 `yaml:"farid"`
+	ID                 uint32              `yaml:"id"`
+	PDI                *PDI                `yaml:"pdi"`
+	Precedence         uint32              `yaml:"precedence"`
+	FARID              uint32              `yaml:"farid"`
+	OuterHeaderRemoval *OuterHeaderRemoval `yaml:"outerHeaderRemoval,omitempty"`
+}
+
+type OuterHeaderRemoval struct {
+	description             uint32
+	extensionHeaderDeletion uint32
+}
+
+type PDRs []*PDR
+
+func (pdrs PDRs) Len() int {
+	return len(pdrs)
+}
+func (pdrs PDRs) Less(i, j int) bool {
+	// element with highest precedence (lowest value in Precedence IE) should be sorted first
+	return pdrs[i].Precedence < pdrs[j].Precedence
+}
+
+func (pdrs PDRs) Swap(i, j int) {
+	pdrs[i], pdrs[j] = pdrs[j], pdrs[i]
+}
+
+type OuterHeaderCreation struct {
+	TEID     uint32 `yaml:"teid"`
+	GTPUPeer string `yaml:"gtpuPeer"`
+	uConn    *gtpv1.UPlaneConn
+}
+
+type ForwardingParameters struct {
+	DestinationInterface string               `yaml:"destinationInterface"`
+	OuterHeaderCreation  *OuterHeaderCreation `yaml:"outerHeaderCreation,omitempty"`
 }
 
 type FAR struct {
-	ID       uint32 `yaml:"id"`
-	TEID     uint32 `yaml:"teid"`
-	GTPUPeer string `yaml:"gtpuPeer"`
+	ID                   uint32                `yaml:"id"`
+	ForwardingParameters *ForwardingParameters `yaml:"forwardingParameters"`
 }
 
-type GTPUProtocolEntity struct {
-	IpAddress string `yaml:"ipAddress"`
-	PDRs      []*PDR `yaml:"pdrs"`
-	FARs      []*FAR `yaml:"fars"`
-}
-
-type IPEndpoint struct {
-	GTPUPeer  string `yaml:"gtpuPeer"`
-	TEID      uint32 `yaml:"teid"`
-	LocalAddr string `yaml:"laddr"`
+type PFCPSession struct {
+	PDRS []*PDR `yaml:"pdrs"`
+	FARS []*FAR `yaml:"fars"`
 }
 
 type UpfConfig struct {
-	GTPUProtocolEntities []*GTPUProtocolEntity `yaml:"entities"`
-	IPEndpoints          []*IPEndpoint         `yaml:"ipEndpoints"`
+	GTPUProtocolEntities []string       `yaml:"gtpu-entities"`
+	PFCPSessions         []*PFCPSession `yaml:"pfcp-sessions"`
 }

@@ -1,6 +1,16 @@
-entities:
-  - ipAddress: "10.0.10.2"
-ipEndpoints:
-  - gtpuPeer: "10.0.10.3"
-    teid: 1
-    laddr: "10.0.10.2"
+gtpu-entities:
+  - "10.0.10.2"
+pfcp-sessions:
+  - pdrs:
+      - id: 1
+        precedence: 255
+        pdi:
+          sourceInterface: "Access"
+        farid: 1
+    fars:
+      - id: 1
+        forwardingParameters:
+          destinationInterface: "Core"
+          outerHeaderCreation:
+            teid: 1
+            gtpuPeer: "10.0.10.3"

@@ -1,20 +1,41 @@
-entities:
-  - ipAddress: "10.0.10.3" 
-    pdrs:
+gtpu-entities:
+  - "10.0.10.3" 
+  - "10.0.20.3" 
+  - "10.0.30.3" 
+pfcp-sessions:
+  - pdrs:
       - id: 1
-        teid: 1
+        precedence: 255
+        pdi:
+          sourceInterface: "Access"
+          fteid:
+            teid: 1
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
         farid: 1
       - id: 2
-        teid: 3
+        precedence: 255
+        pdi:
+          sourceInterface: "Access"
+          fteid:
+            teid: 3
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
         farid: 2
     fars:
       - id: 1
-        teid: 2
-        gtpuPeer: "10.0.20.2"
+        forwardingParameters:
+          destinationInterface: "Core"
+          outerHeaderCreation:
+            teid: 2
+            gtpuPeer: "10.0.20.2"
       - id: 2
-        teid: 4
-        gtpuPeer: "10.0.30.2"
-
-  - ipAddress: "10.0.20.3" 
-  - ipAddress: "10.0.30.3" 
-ipEndpoints:
+        forwardingParameters:
+          destinationInterface: "Core"
+          outerHeaderCreation:
+            teid: 4
+            gtpuPeer: "10.0.30.2"
