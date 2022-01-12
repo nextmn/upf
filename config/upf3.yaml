@@ -1,0 +1,19 @@
+gtpu-entities:
+  - "10.0.20.2"
+pfcp-sessions:
+  - pdrs:
+    - id: 1
+      precedence: 255
+      pdi:
+        sourceInterface: "Access"
+        fteid:
+          teid: 2
+          ipAddress: "10.0.20.2"
+      farid: 1
+      outerHeaderRemoval:
+        description: 0
+        extensionHeaderDeletion: 0
+    fars:
+      - id: 1
+        forwardingParameters:
+          destinationInterface: "Core"

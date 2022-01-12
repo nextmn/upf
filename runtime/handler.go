@@ -66,19 +66,12 @@ func handleOuterHeaderRemoval(packet []byte, outerHeaderRemovalIE *OuterHeaderRe
 	case 6:
 		fallthrough // GTP-U/UDP/IP
 	default: // For future use. Shall not be sent. If received, shall be interpreted as the value "1".
-		m, err := message.Parse(packet)
+		var h message.Header
+		err := h.UnmarshalBinary(packet)
 		if err != nil {
 			return nil, nil, err
 		}
-		packet = packet[:m.MarshalLen()]
-		mh, err := message.Marshal(m)
-		if err != nil {
-			return nil, nil, err
-		}
-		h, err := message.ParseHeader(mh)
-		if err != nil {
-			return nil, nil, err
-		}
+		packet = h.Payload
 		// Generate list of ExtensionHeaders to forward
 		var headers_tmp []*message.ExtensionHeader
 		for _, eh := range h.ExtensionHeaders {
@@ -169,19 +162,16 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 			laddr := c.LocalAddr().(*net.UDPAddr)
 			ch := make(chan bool)
 			go func(ch chan bool) error {
-				fmt.Println("Entering gouroutine")
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				uConn, err := gtpv1.DialUPlane(ctx, laddr, raddr)
 				if err != nil {
-					fmt.Println("Dial failure")
+					log.Println("Dial failure")
 					return err
 				}
-				fmt.Println("Dial success")
 				defer uConn.Close()
 				far.ForwardingParameters.OuterHeaderCreation.uConn = uConn
 				close(ch)
-				fmt.Println("Exiting goroutine")
 				for {
 					select {}
 				}
@@ -192,6 +182,7 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 		if err != nil {
 			return err
 		}
+		log.Println("Forwarding gpdu to", raddr, gpdu.String())
 		far.ForwardingParameters.OuterHeaderCreation.uConn.WriteTo(b, raddr)
 	} else {
 		// forward using TUN interface

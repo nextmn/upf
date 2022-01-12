@@ -41,8 +41,8 @@ services:
         ipv4_address: 10.0.30.3
         ipv6_address: fd00:d0cc:e700:1111:3::3
   gtp-3:
-    container_name: gtp3-
-    hostname: gtp3-
+    container_name: gtp-3
+    hostname: gtp-3
     build:
       context: ./dockertest
     image: deb-test-gtp 
