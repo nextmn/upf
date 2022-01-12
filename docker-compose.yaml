@@ -57,6 +57,9 @@ services:
       net2:
         ipv4_address: 10.0.20.2
         ipv6_address: fd00:d0cc:e700:1111:2::2
+      dn1:
+        ipv4_address: 10.0.40.3
+        ipv6_address: fd00:d0cc:e700:1111:4::3
   gtp-4:
     container_name: gtp-4
     hostname: gtp-4
@@ -74,6 +77,44 @@ services:
       net3:
         ipv4_address: 10.0.30.2
         ipv6_address: fd00:d0cc:e700:1111:3::2
+      dn2:
+        ipv4_address: 10.0.50.3
+        ipv6_address: fd00:d0cc:e700:1111:5::3
+  target-1:
+    container_name: target-1
+    hostname: target-1
+    build:
+      context: ./dockertest
+    image: deb-test-gtp 
+    command: sleep infinity
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - .:/volume
+    networks:
+      dn1:
+        ipv4_address: 10.0.40.2
+        ipv6_address: fd00:d0cc:e700:1111:4::2
+  target-2:
+    container_name: target-2
+    hostname: target-2
+    build:
+      context: ./dockertest
+    image: deb-test-gtp 
+    command: sleep infinity
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - .:/volume
+    networks:
+      dn2:
+        ipv4_address: 10.0.50.2
+        ipv6_address: fd00:d0cc:e700:1111:5::2
+   
 
 
 
@@ -113,3 +154,25 @@ networks:
       config:
         - subnet: 10.0.30.0/24
         - subnet: fd00:d0cc:e700:1111:3::/80
+  dn1:
+    name: dn1 
+    enable_ipv6: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: dn1 
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.40.0/24
+        - subnet: fd00:d0cc:e700:1111:4::/80
+  dn2:
+    name: dn2 
+    enable_ipv6: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: dn2
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.50.0/24
+        - subnet: fd00:d0cc:e700:1111:5::/80

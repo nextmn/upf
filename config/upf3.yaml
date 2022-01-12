@@ -13,7 +13,20 @@ pfcp-sessions:
       outerHeaderRemoval:
         description: 0
         extensionHeaderDeletion: 0
+    - id: 2
+      precedence: 255
+      pdi:
+        sourceInterface: "Core"
+      farid: 2
+
     fars:
       - id: 1
         forwardingParameters:
           destinationInterface: "Core"
+      - id: 2
+        forwardingParameters:
+          destinationInterface: "Access"
+          outerHeaderCreation:
+            teid: 5
+            gtpuPeer: "10.0.20.3"
+

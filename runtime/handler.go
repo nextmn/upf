@@ -182,7 +182,7 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 		if err != nil {
 			return err
 		}
-		log.Println("Forwarding gpdu to", raddr, gpdu.String())
+		log.Println("Forwarding gpdu to", raddr)
 		far.ForwardingParameters.OuterHeaderCreation.uConn.WriteTo(b, raddr)
 	} else {
 		// forward using TUN interface

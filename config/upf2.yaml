@@ -26,6 +26,17 @@ pfcp-sessions:
           description: 0
           extensionHeaderDeletion: 0
         farid: 2
+      - id: 3
+        precedence: 255
+        pdi:
+          sourceInterface: "Core"
+          fteid:
+            teid: 5
+            ipAddress: "10.0.20.3"
+        farid: 3
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
     fars:
       - id: 1
         forwardingParameters:
@@ -39,3 +50,9 @@ pfcp-sessions:
           outerHeaderCreation:
             teid: 4
             gtpuPeer: "10.0.30.2"
+      - id: 3
+        forwardingParameters:
+          destinationInterface: "Access"
+          outerHeaderCreation:
+            teid: 6
+            gtpuPeer: "10.0.10.2"
