@@ -7,6 +7,9 @@ import (
 	"net"
 	"strings"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
 )
@@ -18,7 +21,7 @@ func ipPacketHandler(packet []byte) error {
 		log.Println("Could not find associated PFCP Session for IP packet on TUN interface")
 		return err
 	}
-	pdr, err := findPDR(pfcpSession, false, 0, "")
+	pdr, err := findPDR(pfcpSession, false, 0, "", packet)
 	if err != nil {
 		log.Println("Could not find PDR for IP packet on TUN interface")
 		return err
@@ -34,13 +37,13 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not find associated PFCP Session for message")
 		return err
 	}
-	pdr, err := findPDR(pfcpSession, true, msg.TEID(), iface)
+	packet := make([]byte, 1500)
+	msg.MarshalTo(packet)
+	pdr, err := findPDR(pfcpSession, true, msg.TEID(), iface, packet)
 	if err != nil {
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
 		return err
 	}
-	packet := make([]byte, 1500)
-	msg.MarshalTo(packet)
 	handleIncommingPacket(packet, pfcpSession, pdr)
 	return nil
 }
@@ -192,10 +195,10 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 
 }
 
-func findPDR(session *PFCPSession, isGTP bool, teid uint32, iface string) (pdr *PDR, err error) {
+func findPDR(session *PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (pdr *PDR, err error) {
 	// session.PDRS is already sorted
 	for _, pdr := range session.PDRS {
-		if isPDIMatching(isGTP, pdr.PDI, teid, iface) {
+		if isPDIMatching(isGTP, pdr.PDI, teid, iface, pdu) {
 			return pdr, nil
 		}
 	}
@@ -221,10 +224,141 @@ func getPFCPSessionIP(packet []byte) (pfcpSession *PFCPSession, err error) {
 	return Upf.PFCPSessions[0], nil
 }
 
-func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string) bool {
+func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byte) (res bool) {
 	if isGTP {
-		return (pdi.FTEID != nil) && (pdi.FTEID.TEID == teid) && (pdi.FTEID.IPAddress == iface)
+		res = (pdi.FTEID != nil) && (pdi.FTEID.TEID == teid) && (pdi.FTEID.IPAddress == iface)
 	} else {
-		return (pdi.FTEID == nil)
+		res = (pdi.FTEID == nil)
 	}
+
+	if res && (pdi.SDFFilter != nil) {
+		if isGTP {
+			// get ip packet to apply filters
+			var h message.Header
+			err := h.UnmarshalBinary(packet)
+			if err != nil {
+				return false
+			}
+			packet = h.Payload
+		}
+		var err error
+		res, err = checkIPFilterRule(pdi.SDFFilter.FlowDescription, pdi.SourceInterface, packet)
+		if err != nil {
+			return false
+		}
+	}
+	return res
+}
+
+func checkIPFilterRule(rule string, sourceInterface string, pdu []byte) (res bool, err error) {
+	if sourceInterface != "Access" {
+		return false, fmt.Errorf("IP Filter Rule is only implemented for when source interface is ACCESS")
+	}
+	// IP Filter rule is specified in clause 5.4.2 of 3GPP TS 29.212
+	r := strings.Split(rule, " ")
+	if r[3] != "from" || (r[5] != "to" && r[6] != "to") {
+		return false, fmt.Errorf("Malformed IP Filter Rule")
+	}
+	action := r[0]
+	dir := r[1]
+	proto := r[2]
+	src := r[4]
+	var dst string
+	srcPorts := ""
+	dstPorts := ""
+	optionsList := map[string]struct{}{"frag": {}, "ipoptions": {}, "tcpoptions": {}, "established": {}, "setup": {}, "tcpflags": {}, "icmptypes": {}}
+	if r[5] != "to" {
+		srcPorts = r[5]
+		dst = r[7]
+		if len(r) > 8 {
+			if _, ok := optionsList[r[8]]; ok {
+				return false, fmt.Errorf("IP Filter Rule shall not use options")
+			} else {
+				dstPorts = r[8]
+			}
+		}
+
+	} else {
+		dst = r[6]
+		if len(r) > 7 {
+			if _, ok := optionsList[r[7]]; ok {
+				return false, fmt.Errorf("IP Filter Rule shall not use options")
+			} else {
+				dstPorts = r[7]
+			}
+		}
+	}
+	if action != "permit" {
+		return false, fmt.Errorf("IP Filter Rule action shall be keyword 'permit'")
+	}
+	if dir != "out" {
+		return false, fmt.Errorf("IP Filter Rule direction shall be keyword 'out'")
+	}
+	if proto != "ip" {
+		return false, fmt.Errorf("IP Filter Rule protocol is only implemented with value 'ip'")
+	}
+	if strings.HasPrefix(src, "!") || strings.HasPrefix(dst, "!") {
+		return false, fmt.Errorf("IP Filter Rule shall not use the invert modifier '!'")
+	}
+	if srcPorts != "" {
+		return false, fmt.Errorf("IP Filter Rule with ports in source is not implemented")
+	}
+	if dstPorts != "" {
+		return false, fmt.Errorf("IP Filter Rule with ports in destination is not implemented")
+	}
+	var srcpdu net.IP
+	var dstpdu net.IP
+	if waterutil.IsIPv4(pdu) {
+		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+		srcpdu = p.SrcIP
+		dstpdu = p.DstIP
+	} else if waterutil.IsIPv6(pdu) {
+		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+		srcpdu = p.SrcIP
+		dstpdu = p.DstIP
+	} else {
+		return false, fmt.Errorf("PDU is not IPv4 or IPv6")
+	}
+	if src != "any" {
+		if strings.Contains(src, "/") {
+			_, srcNet, err := net.ParseCIDR(src)
+			if err != nil {
+				fmt.Println(err)
+				return false, err
+			}
+			if !srcNet.Contains(srcpdu) {
+				return false, nil
+			}
+		} else {
+			srcIp := net.ParseIP(src)
+			if srcIp == nil {
+				return false, fmt.Errorf("Invalid IP address in SDF Flow Description for source")
+			}
+			if !(srcIp.Equal(srcpdu)) {
+				return false, nil
+			}
+		}
+	}
+	if dst != "any" {
+		if strings.Contains(dst, "/") {
+			_, dstNet, err := net.ParseCIDR(dst)
+			if err != nil {
+				fmt.Println(err)
+				return false, err
+			}
+			if !dstNet.Contains(dstpdu) {
+				return false, nil
+			}
+		} else {
+			dstIp := net.ParseIP(dst)
+			if dstIp == nil {
+				return false, fmt.Errorf("Invalid IP address in SDF Flow Description for destination")
+			}
+			if !dstIp.Equal(dstpdu) {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
 }

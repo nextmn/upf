@@ -3,6 +3,7 @@ module github.com/louisroyer/nextmn-upf
 go 1.15
 
 require (
+	github.com/google/gopacket v1.1.19
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/urfave/cli/v2 v2.3.0

@@ -25,9 +25,15 @@ type FTEID struct {
 	TEID      uint32 `yaml:"teid"`
 	IPAddress string `yaml:"ipAddress"`
 }
+
+type SDFFilter struct {
+	FlowDescription string `yaml:"description"`
+}
+
 type PDI struct {
-	SourceInterface string `yaml:"sourceInterface"`
-	FTEID           *FTEID `yaml:"fteid,omitempty"` // not required if source is not encapsulated
+	SourceInterface string     `yaml:"sourceInterface"`
+	FTEID           *FTEID     `yaml:"fteid,omitempty"` // not required if source is not encapsulated
+	SDFFilter       *SDFFilter `yaml:"sdf-filter,omitempty"`
 }
 
 type PDR struct {
