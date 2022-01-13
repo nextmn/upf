@@ -1,5 +1,7 @@
 gtpu-entities:
   - "10.0.10.2"
+simulate-ran:
+  ran: "10.0.200.1/24"
 pfcp-sessions:
   - pdrs:
       - id: 1

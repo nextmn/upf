@@ -78,7 +78,18 @@ type PFCPSession struct {
 	FARS []*FAR `yaml:"fars"`
 }
 
+type DNN struct {
+	Dnn  string `yaml:"dnn"`
+	Cidr string `yaml:"cidr"`
+}
+
+type RAN struct {
+	Ran string `yaml:"ran"`
+}
+
 type UpfConfig struct {
 	GTPUProtocolEntities []string       `yaml:"gtpu-entities"`
+	DNNList              []*DNN         `yaml:"dnn_list,omitempty"`
 	PFCPSessions         []*PFCPSession `yaml:"pfcp-sessions"`
+	SimulateRAN          *RAN           `yaml:"simulate-ran,omitempty"`
 }

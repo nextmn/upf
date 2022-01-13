@@ -19,9 +19,22 @@ var Upf *UpfConfig
 var TUNInterface *water.Interface
 
 func Run() error {
-	createPFCPNode()
-	createTUNInterface()
-	createGtpUProtocolEntities()
+	err := createPFCPNode()
+	if err != nil {
+		return err
+	}
+	err = createTUNInterface()
+	if err != nil {
+		return err
+	}
+	err = createDLRoutes()
+	if err != nil {
+		return err
+	}
+	err = createGtpUProtocolEntities()
+	if err != nil {
+		return err
+	}
 	for {
 		select {}
 	}
@@ -61,6 +74,20 @@ func createTUNInterface() error {
 		}
 		return nil
 	}()
+	return nil
+}
+
+func createDLRoutes() error {
+	if Upf.DNNList == nil {
+		return nil
+	}
+	for _, ue := range Upf.DNNList {
+		err := runIP("route", "add", ue.Cidr, "dev", TUNInterface.Name())
+		if err != nil {
+			log.Println("Cannot create Uplink route for", ue.Cidr)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -136,17 +163,24 @@ func createTun() error {
 		log.Println("Unable to allocate TUN interface:", err)
 		return err
 	}
-	runIP("link", "set", "dev", iface.Name(), "mtu", "1400")
+	err = runIP("link", "set", "dev", iface.Name(), "mtu", "1400")
 	if nil != err {
 		log.Println("Unable to set MTU for", iface.Name())
 		return err
 	}
-	runIP("link", "set", "dev", iface.Name(), "up")
+	err = runIP("link", "set", "dev", iface.Name(), "up")
 	if nil != err {
 		log.Println("Unable to set", iface.Name(), "up")
 		return err
 	}
-
 	TUNInterface = iface
+
+	if Upf.SimulateRAN != nil {
+		log.Println("Simulating RAN with ip", Upf.SimulateRAN.Ran)
+		err = runIP("addr", "add", Upf.SimulateRAN.Ran, "dev", iface.Name())
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
