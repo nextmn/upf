@@ -145,11 +145,49 @@ func runIP(args ...string) error {
 	return nil
 }
 
+func runIPTables(args ...string) error {
+	cmd := exec.Command("iptables", args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	err := cmd.Run()
+	if nil != err {
+		errLog := fmt.Sprintf("Error running %s: %s", cmd.Args[0], err)
+		log.Println(errLog)
+		return err
+	}
+	return nil
+}
+
+func runIP6Tables(args ...string) error {
+	cmd := exec.Command("ip6tables", args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	err := cmd.Run()
+	if nil != err {
+		errLog := fmt.Sprintf("Error running %s: %s", cmd.Args[0], err)
+		log.Println(errLog)
+		return err
+	}
+	return nil
+}
+
 func removeTun() error {
 	err := runIP("link", "del", TUNInterface.Name())
 	if nil != err {
 		log.Println("Unable to delete interface ", TUNInterface.Name(), ":", err)
 		return err
+	}
+	if Upf.SimulateRAN == nil {
+		err = runIPTables("-D", "OUTPUT", "-o", TUNInterface.Name(), "-p", "icmp", "--icmp-type", "redirect", "-j", "DROP")
+		if err != nil {
+			log.Println("Error while removing iptable rule to drop icmp redirects")
+		}
+		err = runIP6Tables("-D", "OUTPUT", "-o", TUNInterface.Name(), "-p", "icmpv6", "--icmpv6-type", "redirect", "-j", "DROP")
+		if err != nil {
+			log.Println("Error while removing iptable rule to drop icmpv6 redirects")
+		}
 	}
 	return nil
 }
@@ -179,6 +217,17 @@ func createTun() error {
 		log.Println("Simulating RAN with ip", Upf.SimulateRAN.Ran)
 		err = runIP("addr", "add", Upf.SimulateRAN.Ran, "dev", iface.Name())
 		if err != nil {
+			return err
+		}
+	} else {
+		err = runIPTables("-A", "OUTPUT", "-o", iface.Name(), "-p", "icmp", "--icmp-type", "redirect", "-j", "DROP")
+		if err != nil {
+			log.Println("Error while setting iptable rule to drop icmp redirects")
+			return err
+		}
+		err = runIP6Tables("-A", "OUTPUT", "-o", iface.Name(), "-p", "icmpv6", "--icmpv6-type", "redirect", "-j", "DROP")
+		if err != nil {
+			log.Println("Error while setting iptable rule to drop icmpv6 redirects")
 			return err
 		}
 	}
