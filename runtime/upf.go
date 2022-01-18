@@ -31,7 +31,7 @@ func Run() error {
 	if err != nil {
 		return err
 	}
-	err = createGtpUProtocolEntities()
+	err = createGTPUProtocolEntities()
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func createDLRoutes() error {
 	return nil
 }
 
-func createGtpUProtocolEntities() error {
+func createGTPUProtocolEntities() error {
 	for _, v := range Upf.GTPUProtocolEntities {
 		go createGtpUProtocolEntity(v)
 	}
@@ -214,11 +214,27 @@ func createTun() error {
 	TUNInterface = iface
 
 	if Upf.SimulateRAN != nil {
-		log.Println("Simulating RAN with ip", Upf.SimulateRAN.Ran)
-		err = runIP("addr", "add", Upf.SimulateRAN.Ran, "dev", iface.Name())
-		if err != nil {
-			return err
+		if Upf.SimulateRAN.IPv4Address != "" {
+			log.Println("Simulating RAN with ip", Upf.SimulateRAN.IPv4Address)
+			err = runIP("addr", "add", Upf.SimulateRAN.IPv4Address, "dev", iface.Name())
+			if err != nil {
+				log.Println("Error adding IPv4 address to interface", iface.Name())
+				return err
+			}
+		} else {
+			log.Println("No IPv4 address for RAN")
 		}
+		if Upf.SimulateRAN.IPv6Address != "" {
+			log.Println("Simulating RAN with ip", Upf.SimulateRAN.IPv6Address)
+			err = runIP("addr", "add", Upf.SimulateRAN.IPv6Address, "dev", iface.Name())
+			if err != nil {
+				log.Println("Error adding IPv6 address to interface", iface.Name())
+				return err
+			}
+		} else {
+			log.Println("No IPv6 address for RAN")
+		}
+
 	} else {
 		err = runIPTables("-A", "OUTPUT", "-o", iface.Name(), "-p", "icmp", "--icmp-type", "redirect", "-j", "DROP")
 		if err != nil {

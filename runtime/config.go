@@ -95,7 +95,8 @@ type DNN struct {
 }
 
 type RAN struct {
-	Ran string `yaml:"ran"`
+	IPv4Address string `yaml:"ipv4"`
+	IPv6Address string `yaml:"ipv6"`
 }
 
 type UpfConfig struct {

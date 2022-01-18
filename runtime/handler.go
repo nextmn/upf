@@ -44,6 +44,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
 		return err
 	}
+	log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
 	handleIncommingPacket(packet, pfcpSession, pdr)
 	return nil
 }
@@ -189,6 +190,7 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 		far.ForwardingParameters.OuterHeaderCreation.uConn.WriteTo(b, raddr)
 	} else {
 		// forward using TUN interface
+		log.Println("Forwarding gpdu to tun interface")
 		TUNInterface.Write(packet)
 	}
 	return nil
