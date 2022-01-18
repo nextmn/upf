@@ -1,32 +1,151 @@
 gtpu-entities:
-  - "10.0.10.2"
-simulate-ran:
-  ran: "10.0.200.1/24"
+  - "10.0.10.3" 
+  - "10.0.20.3" 
+  - "10.0.30.3" 
+dnn_list:
+  - dnn: "sliceA"
+    cidr: "10.0.200.0/24"
 pfcp-sessions:
-  - pdrs:
-      - id: 1
+  - pdrs: 
+      - id: 1 # To C-DN
         precedence: 255
         pdi:
           sourceInterface: "Access"
-        farid: 1
-      - id: 2
-        precedence: 255
-        pdi:
-          sourceInterface: "Core"
           fteid:
-            teid: 6
-            ipAddress: "10.0.10.2"
-        farid: 2
+            teid: 1
+            ipAddress: "10.0.10.3"
         outerHeaderRemoval:
           description: 0
           extensionHeaderDeletion: 0
+        farid: 1
+      - id: 2 # To I-DN
+        precedence: 254
+        pdi:
+          sourceInterface: "Access"
+          sdf-filter:
+            description: "permit out ip from 10.0.200.1 to 10.0.50.0/24"
+          fteid:
+            teid: 1
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 2
+      - id: 3 # To I-DN
+        precedence: 254
+        pdi:
+          sourceInterface: "Access"
+          sdf-filter:
+            description: "permit out ip from 10.0.200.1 to 10.0.200.0/24"
+          fteid:
+            teid: 1
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 2
+      - id: 4 # From C-DN
+        precedence: 255
+        pdi:
+          ue-ip-address:
+            ip-address: "10.0.200.1"
+          sourceInterface: "Core"
+          fteid:
+            teid: 1
+            ipAddress: "10.0.20.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 3
+      - id: 5 # From I-DN
+        precedence: 255
+        pdi:
+          ue-ip-address:
+            ip-address: "10.0.200.1"
+          sourceInterface: "SGi-LAN/N6-LAN"
+        farid: 3
+      - id: 6 # To C-DN
+        precedence: 255
+        pdi:
+          sourceInterface: "Access"
+          fteid:
+            teid: 2
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 4
+      - id: 7 # To I-DN
+        precedence: 254
+        pdi:
+          sourceInterface: "Access"
+          sdf-filter:
+            description: "permit out ip from 10.0.200.2 to 10.0.50.0/24"
+          fteid:
+            teid: 2
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 2
+      - id: 8 # To I-DN
+        precedence: 254
+        pdi:
+          sourceInterface: "Access"
+          sdf-filter:
+            description: "permit out ip from 10.0.200.2 to 10.0.200.0/24"
+          fteid:
+            teid: 2
+            ipAddress: "10.0.10.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 2
+      - id: 9 # From C-DN
+        precedence: 255
+        pdi:
+          ue-ip-address:
+            ip-address: "10.0.200.2"
+          sourceInterface: "Core"
+          fteid:
+            teid: 2
+            ipAddress: "10.0.20.3"
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+        farid: 5
+      - id: 5 # From I-DN
+        precedence: 255
+        pdi:
+          ue-ip-address:
+            ip-address: "10.0.200.2"
+          sourceInterface: "SGi-LAN/N6-LAN"
+        farid: 5
     fars:
       - id: 1
         forwardingParameters:
           destinationInterface: "Core"
           outerHeaderCreation:
             teid: 1
-            gtpuPeer: "10.0.10.3"
+            gtpuPeer: "10.0.20.2"
       - id: 2
         forwardingParameters:
+          destinationInterface: "SGi-LAN/N6-LAN"
+      - id: 3
+        forwardingParameters:
           destinationInterface: "Access"
+          outerHeaderCreation:
+            teid: 1
+            gtpuPeer: "10.0.10.2"
+      - id: 4
+        forwardingParameters:
+          destinationInterface: "Core"
+          outerHeaderCreation:
+            teid: 2
+            gtpuPeer: "10.0.20.2"
+      - id: 5
+        forwardingParameters:
+          destinationInterface: "Access"
+          outerHeaderCreation:
+            teid: 2
+            gtpuPeer: "10.0.10.4"

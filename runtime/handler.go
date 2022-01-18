@@ -231,7 +231,7 @@ func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byt
 		res = (pdi.FTEID == nil)
 	}
 
-	if res && (pdi.SDFFilter != nil) {
+	if res && ((pdi.SDFFilter != nil) || (pdi.UEIPAddress != nil)) {
 		if isGTP {
 			// get ip packet to apply filters
 			var h message.Header
@@ -242,12 +242,52 @@ func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byt
 			packet = h.Payload
 		}
 		var err error
-		res, err = checkIPFilterRule(pdi.SDFFilter.FlowDescription, pdi.SourceInterface, packet)
-		if err != nil {
-			return false
+		if pdi.UEIPAddress != nil {
+			res, err = checkUEIPAddress(pdi.UEIPAddress.IPAddress, pdi.SourceInterface, packet)
+			if err != nil {
+				return false
+			}
+		}
+		if pdi.SDFFilter != nil {
+			res, err = checkIPFilterRule(pdi.SDFFilter.FlowDescription, pdi.SourceInterface, packet)
+			if err != nil {
+				return false
+			}
 		}
 	}
 	return res
+}
+
+func checkUEIPAddress(ueipaddress string, sourceInterface string, pdu []byte) (res bool, err error) {
+	var srcpdu net.IP
+	var dstpdu net.IP
+	if waterutil.IsIPv4(pdu) {
+		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+		srcpdu = p.SrcIP
+		dstpdu = p.DstIP
+	} else if waterutil.IsIPv6(pdu) {
+		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+		srcpdu = p.SrcIP
+		dstpdu = p.DstIP
+	} else {
+		return false, fmt.Errorf("PDU is not IPv4 or IPv6")
+	}
+	ueIp := net.ParseIP(ueipaddress)
+	if ueIp == nil {
+		return false, fmt.Errorf("Invalid UE IP Address")
+	}
+	if sourceInterface == "Access" {
+		// check ip src field
+		if ueIp.Equal(srcpdu) {
+			return true, nil
+		}
+	} else {
+		// check ip dst field
+		if ueIp.Equal(dstpdu) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func checkIPFilterRule(rule string, sourceInterface string, pdu []byte) (res bool, err error) {

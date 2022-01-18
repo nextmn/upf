@@ -1,7 +1,5 @@
 gtpu-entities:
-  - "10.0.10.3" 
-  - "10.0.20.3" 
-  - "10.0.30.3" 
+  - "10.0.20.2"
 dnn_list:
   - dnn: "sliceA"
     cidr: "10.0.200.0/24"
@@ -13,62 +11,51 @@ pfcp-sessions:
           sourceInterface: "Access"
           fteid:
             teid: 1
-            ipAddress: "10.0.10.3"
+            ipAddress: "10.0.20.2"
+        farid: 1
         outerHeaderRemoval:
           description: 0
           extensionHeaderDeletion: 0
-        farid: 1
-      - id: 3
-        precedence: 254
-        pdi:
-          sourceInterface: "Access"
-          sdf-filter:
-            description: "permit out ip from 10.0.200.1 to 10.0.40.0/24"
-          fteid:
-            teid: 1
-            ipAddress: "10.0.10.3"
-        outerHeaderRemoval:
-          description: 0
-          extensionHeaderDeletion: 0
-        farid: 1
       - id: 2
         precedence: 255
         pdi:
           sourceInterface: "Access"
           fteid:
-            teid: 3
-            ipAddress: "10.0.10.3"
+            teid: 2
+            ipAddress: "10.0.20.2"
+        farid: 1
         outerHeaderRemoval:
           description: 0
           extensionHeaderDeletion: 0
-        farid: 2
       - id: 3
         precedence: 255
         pdi:
+          ue-ip-address:
+            ip-address: "10.0.200.1"
           sourceInterface: "Core"
-          fteid:
-            teid: 5
-            ipAddress: "10.0.20.3"
+        farid: 2
+      - id: 4
+        precedence: 255
+        pdi:
+          ue-ip-address:
+            ip-address: "10.0.200.2"
+          sourceInterface: "Core"
         farid: 3
-        outerHeaderRemoval:
-          description: 0
-          extensionHeaderDeletion: 0
+
     fars:
       - id: 1
         forwardingParameters:
           destinationInterface: "Core"
-          outerHeaderCreation:
-            teid: 2
-            gtpuPeer: "10.0.20.2"
       - id: 2
         forwardingParameters:
-          destinationInterface: "Core"
+          destinationInterface: "Access"
           outerHeaderCreation:
-            teid: 4
-            gtpuPeer: "10.0.30.2"
+            teid: 1
+            gtpuPeer: "10.0.20.3"
       - id: 3
         forwardingParameters:
           destinationInterface: "Access"
           outerHeaderCreation:
-            teid: 6
-            gtpuPeer: "10.0.10.2"
+            teid: 2
+            gtpuPeer: "10.0.20.3"
+

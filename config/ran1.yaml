@@ -1,0 +1,32 @@
+gtpu-entities:
+  - "10.0.10.2"
+simulate-ran:
+  ran: "10.0.200.1/24"
+pfcp-sessions:
+  - pdrs:
+      - id: 1
+        precedence: 255
+        pdi:
+          sourceInterface: "Access"
+        farid: 1
+      - id: 2
+        precedence: 255
+        pdi:
+          sourceInterface: "Core"
+          fteid:
+            teid: 1
+            ipAddress: "10.0.10.2"
+        farid: 2
+        outerHeaderRemoval:
+          description: 0
+          extensionHeaderDeletion: 0
+    fars:
+      - id: 1
+        forwardingParameters:
+          destinationInterface: "Core"
+          outerHeaderCreation:
+            teid: 1
+            gtpuPeer: "10.0.10.3"
+      - id: 2
+        forwardingParameters:
+          destinationInterface: "Access"

@@ -1,8 +1,8 @@
 version: "3.8"
 services:
-  gtp-1:
-    container_name: gtp-1
-    hostname: gtp-1
+  ran-1:
+    container_name: ran-1
+    hostname: ran-1
     build:
       context: ./dockertest
     image: deb-test-gtp 
@@ -17,9 +17,26 @@ services:
       net1:
         ipv4_address: 10.0.10.2
         ipv6_address: fd00:d0cc:e700:1111:1::2
-  gtp-2:
-    container_name: gtp-2
-    hostname: gtp-2
+  ran-2:
+    container_name: ran-2
+    hostname: ran-2
+    build:
+      context: ./dockertest
+    image: deb-test-gtp 
+    command: sleep infinity
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - .:/volume
+    networks:
+      net1:
+        ipv4_address: 10.0.10.4
+        ipv6_address: fd00:d0cc:e700:1111:1::4
+  upf-1:
+    container_name: upf-1 
+    hostname: upf-1 
     build:
       context: ./dockertest
     image: deb-test-gtp 
@@ -37,12 +54,12 @@ services:
       net2:
         ipv4_address: 10.0.20.3
         ipv6_address: fd00:d0cc:e700:1111:2::3
-      net3:
-        ipv4_address: 10.0.30.3
-        ipv6_address: fd00:d0cc:e700:1111:3::3
-  gtp-3:
-    container_name: gtp-3
-    hostname: gtp-3
+      dn2:
+        ipv4_address: 10.0.50.3
+        ipv6_address: fd00:d0cc:e700:1111:5::3
+  upf-2:
+    container_name: upf-2
+    hostname: upf-2
     build:
       context: ./dockertest
     image: deb-test-gtp 
@@ -60,26 +77,6 @@ services:
       dn1:
         ipv4_address: 10.0.40.3
         ipv6_address: fd00:d0cc:e700:1111:4::3
-  gtp-4:
-    container_name: gtp-4
-    hostname: gtp-4
-    build:
-      context: ./dockertest
-    image: deb-test-gtp 
-    command: sleep infinity
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - "/dev/net/tun"
-    volumes:
-      - .:/volume
-    networks:
-      net3:
-        ipv4_address: 10.0.30.2
-        ipv6_address: fd00:d0cc:e700:1111:3::2
-      dn2:
-        ipv4_address: 10.0.50.3
-        ipv6_address: fd00:d0cc:e700:1111:5::3
   target-1:
     container_name: target-1
     hostname: target-1
@@ -143,17 +140,6 @@ networks:
       config:
         - subnet: 10.0.20.0/24
         - subnet: fd00:d0cc:e700:1111:2::/80
-  net3:
-    name: net3
-    enable_ipv6: true
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: net3
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.0.30.0/24
-        - subnet: fd00:d0cc:e700:1111:3::/80
   dn1:
     name: dn1 
     enable_ipv6: true

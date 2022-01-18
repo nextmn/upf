@@ -30,10 +30,15 @@ type SDFFilter struct {
 	FlowDescription string `yaml:"description"`
 }
 
+type UEIPAddress struct {
+	IPAddress string `yaml:"ip-address"`
+}
+
 type PDI struct {
-	SourceInterface string     `yaml:"sourceInterface"`
-	FTEID           *FTEID     `yaml:"fteid,omitempty"` // not required if source is not encapsulated
-	SDFFilter       *SDFFilter `yaml:"sdf-filter,omitempty"`
+	SourceInterface string       `yaml:"sourceInterface"`
+	FTEID           *FTEID       `yaml:"fteid,omitempty"` // not required if source is not encapsulated
+	SDFFilter       *SDFFilter   `yaml:"sdf-filter,omitempty"`
+	UEIPAddress     *UEIPAddress `yaml:"ue-ip-address,omitempty"`
 }
 
 type PDR struct {
