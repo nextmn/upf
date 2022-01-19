@@ -238,7 +238,7 @@ pfcp-sessions:
           ue-ip-address:
             ip-address: "fd00:d0cc:e700:2222:1::2"
           sourceInterface: "SGi-LAN/N6-LAN"
-        farid: 5
+        farid: 65
       - id: 99
         precedence: 200
         pdi:
