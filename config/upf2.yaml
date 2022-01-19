@@ -80,36 +80,58 @@ pfcp-sessions:
             ip-address: "fd00:d0cc:e700:2222:1::2"
           sourceInterface: "Core"
         farid: 63
+      - id: 99
+        precedence: 200
+        pdi:
+          sourceInterface: "Access"
+          sdf-filter:
+            description: "permit out ip from fe80::/10 to any"
+        farid: 99
 
     fars:
       - id: 1
+        applyAction:
+          action: "Forward"
         forwardingParameters:
           destinationInterface: "Core"
       - id: 2
+        applyAction:
+          action: "Forward"
         forwardingParameters:
           destinationInterface: "Access"
           outerHeaderCreation:
             teid: 1
             gtpuPeer: "10.0.20.3"
       - id: 3
+        applyAction:
+          action: "Forward"
         forwardingParameters:
           destinationInterface: "Access"
           outerHeaderCreation:
             teid: 2
             gtpuPeer: "10.0.20.3"
       - id: 61
+        applyAction:
+          action: "Forward"
         forwardingParameters:
           destinationInterface: "Core"
       - id: 62
+        applyAction:
+          action: "Forward"
         forwardingParameters:
           destinationInterface: "Access"
           outerHeaderCreation:
             teid: 61
             gtpuPeer: "fd00:d0cc:e700:1111:2::3"
       - id: 63
+        applyAction:
+          action: "Forward"
         forwardingParameters:
           destinationInterface: "Access"
           outerHeaderCreation:
             teid: 62
             gtpuPeer: "fd00:d0cc:e700:1111:2::3"
+      - id: 99
+        applyAction:
+          action: "Drop"
 

@@ -15,7 +15,7 @@ import (
 )
 
 func ipPacketHandler(packet []byte) error {
-	log.Println("Received IP packet on TUN interface")
+	//log.Println("Received IP packet on TUN interface")
 	pfcpSession, err := getPFCPSessionIP(packet)
 	if err != nil {
 		log.Println("Could not find associated PFCP Session for IP packet on TUN interface")
@@ -31,7 +31,7 @@ func ipPacketHandler(packet []byte) error {
 }
 
 func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
-	log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
+	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
 	pfcpSession, err := getPFCPSessionGTP(msg)
 	if err != nil {
 		log.Println("Could not find associated PFCP Session for message")
@@ -44,7 +44,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
 		return err
 	}
-	log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
+	//log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
 	handleIncommingPacket(packet, pfcpSession, pdr)
 	return nil
 }
@@ -132,6 +132,19 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 	if err != nil {
 		log.Println("Could not find FAR associated with PDR", pdr.ID)
 	}
+	if far.ApplyAction != nil {
+		switch far.ApplyAction.Action {
+		case "Drop":
+			return nil
+		case "Forward":
+			break // forwarding
+		default:
+			log.Println("Action", far.ApplyAction.Action, "for FAR", far.ID, "is not implemented yet")
+		}
+	} else {
+		log.Println("Missing forward action for FAR", far.ID)
+	}
+
 	if far.ForwardingParameters.OuterHeaderCreation != nil {
 		// Apply TEID parameter and set back GTP Extension Headers
 		gpdu := message.NewHeaderWithExtensionHeaders(0x30, message.MsgTypeTPDU, far.ForwardingParameters.OuterHeaderCreation.TEID, 0, packet, gtpHeaders...)

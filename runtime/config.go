@@ -79,9 +79,14 @@ type ForwardingParameters struct {
 	OuterHeaderCreation  *OuterHeaderCreation `yaml:"outerHeaderCreation,omitempty"`
 }
 
+type ApplyAction struct {
+	Action string `yaml:"action"`
+}
+
 type FAR struct {
 	ID                   uint32                `yaml:"id"`
-	ForwardingParameters *ForwardingParameters `yaml:"forwardingParameters"`
+	ApplyAction          *ApplyAction          `yaml:"applyAction"`
+	ForwardingParameters *ForwardingParameters `yaml:"forwardingParameters,omitempty"`
 }
 
 type PFCPSession struct {

@@ -99,7 +99,7 @@ func createGTPUProtocolEntities() error {
 }
 
 func createGtpUProtocolEntity(ipAddress string) error {
-	fmt.Println("Creating new GTP-U Protocol Entity")
+	fmt.Println("Creating new GTP-U Protocol Entity on", ipAddress)
 	gtpuPort := "2152"
 	var udpaddr string
 	if strings.Count(ipAddress, ":") > 0 {
