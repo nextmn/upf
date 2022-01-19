@@ -240,7 +240,7 @@ pfcp-sessions:
           sourceInterface: "SGi-LAN/N6-LAN"
         farid: 65
       - id: 99
-        precedence: 200
+        precedence: 255
         pdi:
           sourceInterface: "Access"
           sdf-filter:

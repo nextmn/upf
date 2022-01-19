@@ -81,7 +81,7 @@ pfcp-sessions:
           sourceInterface: "Core"
         farid: 63
       - id: 99
-        precedence: 200
+        precedence: 255
         pdi:
           sourceInterface: "Access"
           sdf-filter:

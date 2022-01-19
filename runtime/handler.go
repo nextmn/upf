@@ -16,12 +16,12 @@ import (
 
 func ipPacketHandler(packet []byte) error {
 	//log.Println("Received IP packet on TUN interface")
-	pfcpSession, err := getPFCPSessionIP(packet)
+	pfcpSessions, err := getPFCPSessionsIP(packet)
 	if err != nil {
 		log.Println("Could not find associated PFCP Session for IP packet on TUN interface")
 		return err
 	}
-	pdr, err := findPDR(pfcpSession, false, 0, "", packet)
+	pfcpSession, pdr, err := findPDR(pfcpSessions, false, 0, "", packet)
 	if err != nil {
 		log.Println("Could not find PDR for IP packet on TUN interface")
 		return err
@@ -32,14 +32,14 @@ func ipPacketHandler(packet []byte) error {
 
 func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
 	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
-	pfcpSession, err := getPFCPSessionGTP(msg)
+	packet := make([]byte, 1500)
+	msg.MarshalTo(packet)
+	pfcpSessions, err := getPFCPSessionsGTP(msg)
 	if err != nil {
 		log.Println("Could not find associated PFCP Session for message")
 		return err
 	}
-	packet := make([]byte, 1500)
-	msg.MarshalTo(packet)
-	pdr, err := findPDR(pfcpSession, true, msg.TEID(), iface, packet)
+	pfcpSession, pdr, err := findPDR(pfcpSessions, true, msg.TEID(), iface, packet)
 	if err != nil {
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
 		return err
@@ -117,6 +117,7 @@ func handleOuterHeaderRemoval(packet []byte, outerHeaderRemovalIE *OuterHeaderRe
 }
 
 func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err error) {
+	//log.Println("Start handling of packet PDR:", pdr.ID)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
 	if pdr.OuterHeaderRemoval != nil {
@@ -210,14 +211,51 @@ func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err e
 
 }
 
-func findPDR(session *PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (pdr *PDR, err error) {
-	// session.PDRS is already sorted
-	for _, pdr := range session.PDRS {
-		if isPDIMatching(isGTP, pdr.PDI, teid, iface, pdu) {
-			return pdr, nil
+func findPDR(sessions []*PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (session *PFCPSession, pdr *PDR, err error) {
+	// On receipt of a user plane packet, the UP function shall perform a lookup of the provisioned PDRs and:
+	// - identify first the PFCP session to which the packet corresponds; and
+	// - find the first PDR matching the incoming packet, among all the PDRs provisioned for this PFCP session, starting
+	//   with the PDRs with the highest precedence and continuing then with PDRs in decreasing order of precedence.
+	//   Only the highest precedence PDR matching the packet shall be selected, i.e. the UP function shall stop the PDRs
+	//   lookup once a matching PDR is found.
+
+	// Different PDRs of different PFCP sessions, not including the Packet Replication and Detection Carry-On
+	// Information IE, shall not overlap, i.e. there shall be at least one PDR in each PFCP session which differs by at
+	// least one different (and not wildcarded) match field in their PDI, such that any incoming user plane packet may
+	// only match PDRs of a single PFCP session.
+
+	// As an exception to the previous principle, the CP function may provision a PDR with all match fields wildcarded
+	// (i.e. all match fields omitted in the PDI) in a separate PFCP session, to control how the UP function shall process
+	// packets unmatched by any PDRs of any other PFCP session. The CP function may provision the UP function to
+	// send these packets to the CP function or to drop them. The UP function shall grant the lowest precedence to this
+	// PDR.
+
+	var sessionWilcard *PFCPSession
+	var pdrWilcard *PDR
+	for _, session := range sessions {
+		// session.PDRS is already sorted
+		for _, pdr := range session.PDRS {
+			if isPDIMatching(isGTP, pdr.PDI, teid, iface, pdu) {
+				if !isPDIAllWilcard(pdr.PDI) {
+					return session, pdr, nil
+				} else {
+					sessionWilcard, pdrWilcard = session, pdr
+				}
+
+			}
 		}
 	}
-	return nil, fmt.Errorf("Could not find PDR for TEID %d", teid)
+	if (sessionWilcard != nil) && (pdrWilcard != nil) {
+		return sessionWilcard, pdrWilcard, nil
+	}
+	return nil, nil, fmt.Errorf("Could not find PDR for TEID %d", teid)
+}
+
+func isPDIAllWilcard(pdi *PDI) bool {
+	if (pdi.FTEID != nil) || (pdi.SDFFilter != nil) || (pdi.UEIPAddress != nil) {
+		return false
+	}
+	return true
 }
 
 func getFAR(FARs []*FAR, pdr *PDR) (far *FAR, err error) {
@@ -229,24 +267,26 @@ func getFAR(FARs []*FAR, pdr *PDR) (far *FAR, err error) {
 	return nil, fmt.Errorf("Could not find FAR with id: %d", pdr.FARID)
 }
 
-func getPFCPSessionGTP(msg message.Message) (pfcpSession *PFCPSession, err error) {
-	//TODO: case of individual PDU session mapped to a PFCP Session
-	return Upf.PFCPSessions[0], nil
+func getPFCPSessionsGTP(msg message.Message) (pfcpSessions []*PFCPSession, err error) {
+	//TODO: filter by PDN Type
+	return Upf.PFCPSessions, nil
 }
 
-func getPFCPSessionIP(packet []byte) (pfcpSession *PFCPSession, err error) {
-	//TODO: case of individual PDU session mapped to a PFCP Session
-	return Upf.PFCPSessions[0], nil
+func getPFCPSessionsIP(packet []byte) (pfcpSessions []*PFCPSession, err error) {
+	//TODO: filter by PDN Type
+	return Upf.PFCPSessions, nil
 }
 
 func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byte) (res bool) {
-	if isGTP {
-		res = (pdi.FTEID != nil) && (pdi.FTEID.TEID == teid) && (pdi.FTEID.IPAddress == iface)
-	} else {
-		res = (pdi.FTEID == nil)
+	if pdi.FTEID != nil {
+		if !isGTP {
+			return false
+		} else if !((pdi.FTEID.TEID == teid) && (pdi.FTEID.IPAddress == iface)) {
+			return false
+		}
 	}
 
-	if res && ((pdi.SDFFilter != nil) || (pdi.UEIPAddress != nil)) {
+	if (pdi.SDFFilter != nil) || (pdi.UEIPAddress != nil) {
 		if isGTP {
 			// get ip packet to apply filters
 			var h message.Header
@@ -259,18 +299,18 @@ func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byt
 		var err error
 		if pdi.UEIPAddress != nil {
 			res, err = checkUEIPAddress(pdi.UEIPAddress.IPAddress, pdi.SourceInterface, packet)
-			if err != nil {
+			if (err != nil) || !res {
 				return false
 			}
 		}
 		if pdi.SDFFilter != nil {
 			res, err = checkIPFilterRule(pdi.SDFFilter.FlowDescription, pdi.SourceInterface, packet)
-			if err != nil {
+			if (err != nil) || !res {
 				return false
 			}
 		}
 	}
-	return res
+	return true
 }
 
 func checkUEIPAddress(ueipaddress string, sourceInterface string, pdu []byte) (res bool, err error) {
@@ -414,6 +454,5 @@ func checkIPFilterRule(rule string, sourceInterface string, pdu []byte) (res boo
 			}
 		}
 	}
-
 	return true, nil
 }

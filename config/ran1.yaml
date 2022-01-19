@@ -43,7 +43,7 @@ pfcp-sessions:
           description: 0
           extensionHeaderDeletion: 0
       - id: 99
-        precedence: 200
+        precedence: 255
         pdi:
           sourceInterface: "Access"
           sdf-filter:
