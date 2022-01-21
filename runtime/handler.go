@@ -32,8 +32,12 @@ func ipPacketHandler(packet []byte) error {
 
 func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
 	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
-	packet := make([]byte, 1500)
-	msg.MarshalTo(packet)
+	packet := make([]byte, msg.MarshalLen())
+	err := msg.MarshalTo(packet)
+	if err != nil {
+		log.Println("Could not marshal gtp packet")
+		return err
+	}
 	pfcpSessions, err := getPFCPSessionsGTP(msg)
 	if err != nil {
 		log.Println("Could not find associated PFCP Session for message")
