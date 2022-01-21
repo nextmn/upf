@@ -48,7 +48,7 @@ pfcp-sessions:
           extensionHeaderDeletion: 0
         farid: 2
       - id: 4 # From C-DN
-        precedence: 255
+        precedence: 254
         pdi:
           ue-ip-address:
             ip-address: "10.0.200.1"
