@@ -26,7 +26,7 @@ func ipPacketHandler(packet []byte) error {
 		log.Println("Could not find PDR for IP packet on TUN interface")
 		return err
 	}
-	handleIncommingPacket(packet, pfcpSession, pdr)
+	handleIncommingPacket(packet, false, pfcpSession, pdr)
 	return nil
 }
 
@@ -49,11 +49,11 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		return err
 	}
 	//log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
-	handleIncommingPacket(packet, pfcpSession, pdr)
+	handleIncommingPacket(packet, true, pfcpSession, pdr)
 	return nil
 }
 
-func handleOuterHeaderRemoval(packet []byte, outerHeaderRemovalIE *OuterHeaderRemoval) (res []byte, headers []*message.ExtensionHeader, err error) {
+func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemovalIE *OuterHeaderRemoval) (res []byte, headers []*message.ExtensionHeader, err error) {
 	switch outerHeaderRemovalIE.description {
 	case 2:
 		fallthrough // UDP/IPv4
@@ -74,6 +74,9 @@ func handleOuterHeaderRemoval(packet []byte, outerHeaderRemovalIE *OuterHeaderRe
 	case 6:
 		fallthrough // GTP-U/UDP/IP
 	default: // For future use. Shall not be sent. If received, shall be interpreted as the value "1".
+		if !isGTP {
+			return nil, nil, fmt.Errorf("Could not handle outer header removal of non-GTP packet")
+		}
 		var h message.Header
 		err := h.UnmarshalBinary(packet)
 		if err != nil {
@@ -120,15 +123,18 @@ func handleOuterHeaderRemoval(packet []byte, outerHeaderRemovalIE *OuterHeaderRe
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(packet []byte, session *PFCPSession, pdr *PDR) (err error) {
+func handleIncommingPacket(packet []byte, isGTP bool, session *PFCPSession, pdr *PDR) (err error) {
 	//log.Println("Start handling of packet PDR:", pdr.ID)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
 	if pdr.OuterHeaderRemoval != nil {
-		packet, gtpHeaders, err = handleOuterHeaderRemoval(packet, pdr.OuterHeaderRemoval)
+		packet, gtpHeaders, err = handleOuterHeaderRemoval(packet, isGTP, pdr.OuterHeaderRemoval)
 		if err != nil {
 			return err
 		}
+	}
+	if len(packet) == 0 {
+		return fmt.Errorf("Incomming packet of len 0")
 	}
 
 	// TODO: apply instruction of associated MARs, QERs, URRs, etc.

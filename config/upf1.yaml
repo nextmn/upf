@@ -105,7 +105,7 @@ pfcp-sessions:
           extensionHeaderDeletion: 0
         farid: 2
       - id: 9 # From C-DN
-        precedence: 255
+        precedence: 254
         pdi:
           ue-ip-address:
             ip-address: "10.0.200.2"
@@ -163,7 +163,7 @@ pfcp-sessions:
           extensionHeaderDeletion: 0
         farid: 62
       - id: 64 # From C-DN
-        precedence: 255
+        precedence: 254
         pdi:
           ue-ip-address:
             ip-address: "fd00:d0cc:e700:2222:1::1"
@@ -220,7 +220,7 @@ pfcp-sessions:
           extensionHeaderDeletion: 0
         farid: 62
       - id: 69 # From C-DN
-        precedence: 255
+        precedence: 254
         pdi:
           ue-ip-address:
             ip-address: "fd00:d0cc:e700:2222:1::2"
