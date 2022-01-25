@@ -23,14 +23,16 @@ func main() {
 	log.SetPrefix("[nextmn-upf] ")
 	var config string
 	app := &cli.App{
-		Name:  "nextmn-upf",
-		Usage: "An upf",
+		Name:                 "nextmn-upf",
+		Usage:                "An upf",
+		EnableBashCompletion: true,
 		Authors: []*cli.Author{
 			{Name: "Louis Royer"},
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "config",
+				Aliases:     []string{"c"},
 				Usage:       "Load configuration from `FILE`",
 				Destination: &config,
 				Required:    true,
