@@ -67,6 +67,9 @@ services:
       dn2:
         ipv4_address: 10.0.50.3
         ipv6_address: fd00:d0cc:e700:1111:5::3
+      cp:
+        ipv4_address: 10.0.60.3
+        ipv6_address: fd00:d0cc:e700:1111:6::3
   upf-2:
     container_name: upf-2
     hostname: upf-2
@@ -91,6 +94,31 @@ services:
       dn1:
         ipv4_address: 10.0.40.3
         ipv6_address: fd00:d0cc:e700:1111:4::3
+      cp:
+        ipv4_address: 10.0.60.4
+        ipv6_address: fd00:d0cc:e700:1111:6::4
+  smf:
+    container_name: smf
+    hostname: smf
+    build:
+      context: ./dockertest
+    working_dir: /volume
+    image: deb-test-gtp 
+    command: sleep infinity
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - ../nextmn-smf:/volume
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.all.forwarding=1
+    networks:
+      cp:
+        ipv4_address: 10.0.60.2
+        ipv6_address: fd00:d0cc:e700:1111:6::2
+
   target-1:
     container_name: target-1
     hostname: target-1
@@ -182,3 +210,14 @@ networks:
       config:
         - subnet: 10.0.50.0/24
         - subnet: fd00:d0cc:e700:1111:5::/80
+  cp:
+    name: cp
+    enable_ipv6: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: cp
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.60.0/24
+        - subnet: fd00:d0cc:e700:1111:6::/80

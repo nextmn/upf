@@ -9,6 +9,7 @@ require (
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 // indirect
 	github.com/wmnsk/go-gtp v0.8.1
+	github.com/wmnsk/go-pfcp v0.0.14
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )

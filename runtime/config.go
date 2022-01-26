@@ -105,6 +105,7 @@ type RAN struct {
 }
 
 type UpfConfig struct {
+	PFCPAddress          *string        `yaml:"pfcp-address,omitempty"`
 	GTPUProtocolEntities []string       `yaml:"gtpu-entities"`
 	DNNList              []*DNN         `yaml:"dnn_list,omitempty"`
 	PFCPSessions         []*PFCPSession `yaml:"pfcp-sessions"`

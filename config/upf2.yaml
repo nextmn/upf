@@ -1,3 +1,4 @@
+pfcp-address: "10.0.60.4"
 gtpu-entities:
   - "10.0.20.2"
   - "fd00:d0cc:e700:1111:2::2"

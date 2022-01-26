@@ -14,6 +14,7 @@ build:
 	go build
 clean:
 	go clean
+reinstall: uninstall install
 install:
 	$(INSTALL) nextmn-upf $(DESTDIR)$(bindir)/nextmn-upf
 	$(INSTALL) bash-completion/completions/nextmn-upf $(BASHCOMPLETIONSDIR)/nextmn-upf

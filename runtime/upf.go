@@ -47,6 +47,14 @@ func createPFCPNode() error {
 	for _, session := range Upf.PFCPSessions {
 		sort.Sort(PDRs(session.PDRS))
 	}
+	if Upf.SimulateRAN == nil {
+		if Upf.PFCPAddress == nil {
+			return fmt.Errorf("Missing pfcp address")
+		}
+		ch := make(chan bool)
+		go pfcpHearthbeatHandler(*Upf.PFCPAddress, ch)
+		_ = <-ch
+	}
 	go func() error {
 		for {
 			select {}
@@ -174,6 +182,9 @@ func runIP6Tables(args ...string) error {
 }
 
 func removeTun() error {
+	if TUNInterface == nil {
+		return nil
+	}
 	err := runIP("link", "del", TUNInterface.Name())
 	if nil != err {
 		log.Println("Unable to delete interface ", TUNInterface.Name(), ":", err)

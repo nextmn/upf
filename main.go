@@ -45,7 +45,12 @@ func main() {
 				fmt.Println("Error loading config, exiting…")
 				os.Exit(1)
 			}
-			upf.Run()
+			err = upf.Run()
+			if err != nil {
+				fmt.Println("Error while running, exiting…")
+				log.Fatal(err)
+				os.Exit(2)
+			}
 			return nil
 		},
 	}
