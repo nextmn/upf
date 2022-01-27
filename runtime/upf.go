@@ -52,7 +52,7 @@ func createPFCPNode() error {
 			return fmt.Errorf("Missing pfcp address")
 		}
 		ch := make(chan bool)
-		go pfcpHearthbeatHandler(*Upf.PFCPAddress, ch)
+		go pfcpHandler(*Upf.PFCPAddress, ch)
 		_ = <-ch
 	}
 	go func() error {
