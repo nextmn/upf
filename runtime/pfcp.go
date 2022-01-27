@@ -12,6 +12,8 @@ import (
 )
 
 func pfcpHearthbeatHandler(ipAddress string, ch chan bool) error {
+	// A CP function or UP function shall be prepared to receive a Heartbeat Request at any time (even from unknown peers)
+	// and it shall reply with a Heartbeat Response.
 	recoveryTimeStamp := ie.NewRecoveryTimeStamp(time.Now())
 	pfcpPort := "8805"
 	var udpaddr string
