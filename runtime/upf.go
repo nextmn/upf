@@ -13,6 +13,7 @@ import (
 	"github.com/songgao/water"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
+	"github.com/louisroyer/go-pfcp-networking"
 )
 
 var Upf *UpfConfig
@@ -51,9 +52,8 @@ func createPFCPNode() error {
 		if Upf.PFCPAddress == nil {
 			return fmt.Errorf("Missing pfcp address")
 		}
-		ch := make(chan bool)
-		go pfcpHandler(*Upf.PFCPAddress, ch)
-		_ = <-ch
+		PFCPServer := pfcp_networking.NewPFCPServerEntity(*Upf.PFCPAddress)
+		PFCPServer.Start()
 	}
 	go func() error {
 		for {
