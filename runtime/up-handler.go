@@ -9,18 +9,17 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	pfcp_networking "github.com/louisroyer/go-pfcp-networking"
+	pfcprule "github.com/louisroyer/go-pfcp-networking/pfcprules"
 	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 func ipPacketHandler(packet []byte) error {
 	//log.Println("Received IP packet on TUN interface")
-	pfcpSessions, err := getPFCPSessionsIP(packet)
-	if err != nil {
-		log.Println("Could not find associated PFCP Session for IP packet on TUN interface")
-		return err
-	}
+	pfcpSessions := getPFCPSessionsIP(packet)
 	pfcpSession, pdr, err := findPDR(pfcpSessions, false, 0, "", packet)
 	if err != nil {
 		log.Println("Could not find PDR for IP packet on TUN interface")
@@ -38,11 +37,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not marshal gtp packet")
 		return err
 	}
-	pfcpSessions, err := getPFCPSessionsGTP(msg)
-	if err != nil {
-		log.Println("Could not find associated PFCP Session for message")
-		return err
-	}
+	pfcpSessions := getPFCPSessionsGTP(msg)
 	pfcpSession, pdr, err := findPDR(pfcpSessions, true, msg.TEID(), iface, packet)
 	if err != nil {
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
@@ -53,8 +48,9 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 	return nil
 }
 
-func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemovalIE *OuterHeaderRemoval) (res []byte, headers []*message.ExtensionHeader, err error) {
-	switch outerHeaderRemovalIE.description {
+func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.IE) (res []byte, headers []*message.ExtensionHeader, err error) {
+	description, _ := outerHeaderRemoval.OuterHeaderRemovalDescription()
+	switch description {
 	case 2:
 		fallthrough // UDP/IPv4
 	case 3:
@@ -66,7 +62,7 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemovalIE *O
 	case 7:
 		fallthrough //VLAN S-TAG
 	case 8: //S-TAG and C-TAG
-		return nil, nil, fmt.Errorf("Could not handle outer header removal with description field set to : %d", outerHeaderRemovalIE.description)
+		return nil, nil, fmt.Errorf("Could not handle outer header removal with description field set to : %d", description)
 	case 0:
 		fallthrough // GTP-U/UDP/IPv4
 	case 1:
@@ -74,6 +70,8 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemovalIE *O
 	case 6:
 		fallthrough // GTP-U/UDP/IP
 	default: // For future use. Shall not be sent. If received, shall be interpreted as the value "1".
+		// TODO: when 9 to 255, send and response with cause Mandatory IE incorrect: Offending IE type outerHeaderRemoval
+		// note: this should be done directly into go-pfcp-networking
 		if !isGTP {
 			return nil, nil, fmt.Errorf("Could not handle outer header removal of non-GTP packet")
 		}
@@ -88,7 +86,8 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemovalIE *O
 		for _, eh := range h.ExtensionHeaders {
 			switch eh.Type {
 			case message.ExtHeaderTypePDUSessionContainer:
-				if outerHeaderRemovalIE.extensionHeaderDeletion != 1 {
+				deletion, _ := outerHeaderRemoval.GTPUExternsionHeaderDeletion()
+				if (deletion & 0x01) != 1 {
 					headers_tmp = append(headers_tmp, message.NewExtensionHeader(eh.Type, eh.Content, message.ExtHeaderTypeNoMoreExtensionHeaders))
 				}
 			default:
@@ -123,12 +122,14 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemovalIE *O
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(packet []byte, isGTP bool, session *PFCPSession, pdr *PDR) (err error) {
+func handleIncommingPacket(packet []byte, isGTP bool, session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR) (err error) {
 	//log.Println("Start handling of packet PDR:", pdr.ID)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
-	if pdr.OuterHeaderRemoval != nil {
-		packet, gtpHeaders, err = handleOuterHeaderRemoval(packet, isGTP, pdr.OuterHeaderRemoval)
+	ohr := pdr.OuterHeaderRemoval()
+
+	if ohr != nil {
+		packet, gtpHeaders, err = handleOuterHeaderRemoval(packet, isGTP, ohr)
 		if err != nil {
 			return err
 		}
@@ -139,32 +140,47 @@ func handleIncommingPacket(packet []byte, isGTP bool, session *PFCPSession, pdr 
 
 	// TODO: apply instruction of associated MARs, QERs, URRs, etc.
 
-	far, err := getFAR(session.FARS, pdr)
+	farid, err := pdr.FARID()
+	if err != nil {
+		return err
+	}
+	far, err := session.GetFAR(farid)
 	if err != nil {
 		log.Println("Could not find FAR associated with PDR", pdr.ID)
 	}
-	if far.ApplyAction != nil {
-		switch far.ApplyAction.Action {
-		case "Drop":
+	applyAction := far.ApplyAction()
+	if applyAction != nil {
+		switch {
+		case applyAction.HasDROP():
 			return nil
-		case "Forward":
+		case applyAction.HasFORW():
 			break // forwarding
 		default:
-			log.Println("Action", far.ApplyAction.Action, "for FAR", far.ID, "is not implemented yet")
+			log.Println("Action", applyAction, "for FAR", farid, "is not implemented yet")
 		}
 	} else {
-		log.Println("Missing forward action for FAR", far.ID)
+		log.Println("Missing forward action for FAR", farid)
 	}
 
-	if far.ForwardingParameters.OuterHeaderCreation != nil {
+	fp, _ := far.ForwardingParameters()
+	ohcfields, _ := ie.NewForwardingParameters(fp...).OuterHeaderCreation()
+
+	if ohcfields != nil {
+		// XXX: No method in go-pfcp to convert OuterHeaderCreationFields directly to ie.IE
+		ohcb, _ := ohcfields.Marshal()
+		ohc := ie.New(ie.OuterHeaderCreation, ohcb)
 		// Apply TEID parameter and set back GTP Extension Headers
-		gpdu := message.NewHeaderWithExtensionHeaders(0x30, message.MsgTypeTPDU, far.ForwardingParameters.OuterHeaderCreation.TEID, 0, packet, gtpHeaders...)
+		if !ohc.HasTEID() {
+			return fmt.Errorf("Missing TEID in Outer Header CReation")
+		}
+
+		gpdu := message.NewHeaderWithExtensionHeaders(0x30, message.MsgTypeTPDU, ohcfields.TEID, 0, packet, gtpHeaders...)
 		if err != nil {
 			return err
 		}
 		gtpuPort := "2152"
 		var udpaddr string
-		ipAddress := far.ForwardingParameters.OuterHeaderCreation.GTPUPeer
+		ipAddress := far.ForwardingParameters.OuterHeaderCreation.GTPUPeer // TODO: IPv4Address / IPv6Address
 		if strings.Count(ipAddress, ":") > 0 {
 			udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, gtpuPort)
 		} else {
@@ -221,7 +237,7 @@ func handleIncommingPacket(packet []byte, isGTP bool, session *PFCPSession, pdr 
 
 }
 
-func findPDR(sessions []*PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (session *PFCPSession, pdr *PDR, err error) {
+func findPDR(sessions []*pfcp_networking.PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR, err error) {
 	// On receipt of a user plane packet, the UP function shall perform a lookup of the provisioned PDRs and:
 	// - identify first the PFCP session to which the packet corresponds; and
 	// - find the first PDR matching the incoming packet, among all the PDRs provisioned for this PFCP session, starting
@@ -240,13 +256,18 @@ func findPDR(sessions []*PFCPSession, isGTP bool, teid uint32, iface string, pdu
 	// send these packets to the CP function or to drop them. The UP function shall grant the lowest precedence to this
 	// PDR.
 
-	var sessionWilcard *PFCPSession
-	var pdrWilcard *PDR
+	var sessionWilcard *pfcp_networking.PFCPSession
+	var pdrWilcard *pfcprule.PDR
 	for _, session := range sessions {
 		// session.PDRS is already sorted
-		for _, pdr := range session.PDRS {
-			if isPDIMatching(isGTP, pdr.PDI, teid, iface, pdu) {
-				if !isPDIAllWilcard(pdr.PDI) {
+		for _, pdr := range session.GetPDRs() {
+			pdicontent, err := pdr.PDI()
+			if err != nil {
+				return nil, nil, err
+			}
+			pdi := ie.NewPDI(pdicontent...)
+			if isPDIMatching(isGTP, pdi, teid, iface, pdu) {
+				if !isPDIAllWilcard(pdi) {
 					return session, pdr, nil
 				} else {
 					sessionWilcard, pdrWilcard = session, pdr
@@ -261,42 +282,38 @@ func findPDR(sessions []*PFCPSession, isGTP bool, teid uint32, iface string, pdu
 	return nil, nil, fmt.Errorf("Could not find PDR for TEID %d", teid)
 }
 
-func isPDIAllWilcard(pdi *PDI) bool {
-	if (pdi.FTEID != nil) || (pdi.SDFFilter != nil) || (pdi.UEIPAddress != nil) {
+func isPDIAllWilcard(pdi *ie.IE) bool {
+	fteid, _ := pdi.FTEID()
+	sdffilter, _ := pdi.SDFFilter()
+	ueipaddress, _ := pdi.UEIPAddress()
+	if (fteid != nil) || (sdffilter != nil) || (ueipaddress != nil) {
 		return false
 	}
 	return true
 }
 
-func getFAR(FARs []*FAR, pdr *PDR) (far *FAR, err error) {
-	for _, far := range FARs {
-		if pdr.FARID == far.ID {
-			return far, nil
-		}
-	}
-	return nil, fmt.Errorf("Could not find FAR with id: %d", pdr.FARID)
-}
-
-func getPFCPSessionsGTP(msg message.Message) (pfcpSessions []*PFCPSession, err error) {
+func getPFCPSessionsGTP(msg message.Message) []*pfcp_networking.PFCPSession {
 	//TODO: filter by PDN Type
-	return Upf.PFCPSessions, nil
+	return PFCPServer.GetPFCPSessions()
 }
 
-func getPFCPSessionsIP(packet []byte) (pfcpSessions []*PFCPSession, err error) {
+func getPFCPSessionsIP(packet []byte) []*pfcp_networking.PFCPSession {
 	//TODO: filter by PDN Type
-	return Upf.PFCPSessions, nil
+	return PFCPServer.GetPFCPSessions()
 }
 
-func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byte) (res bool) {
-	if pdi.FTEID != nil {
+func isPDIMatching(isGTP bool, pdi *ie.IE, teid uint32, iface string, packet []byte) (res bool) {
+	fteid, _ := pdi.FTEID()
+	if fteid != nil {
 		if !isGTP {
 			return false
-		} else if !((pdi.FTEID.TEID == teid) && (pdi.FTEID.IPAddress == iface)) {
+		} else if !((fteid.TEID == teid) && ((fteid.HasIPv4() && fteid.IPv4Address.Equal(net.ParseIP(iface))) || (fteid.HasIPv6() && fteid.IPv6Address.Equal(net.ParseIP(iface))))) {
 			return false
 		}
 	}
-
-	if (pdi.SDFFilter != nil) || (pdi.UEIPAddress != nil) {
+	SDFFilter, _ := pdi.SDFFilter()
+	UEIPAddress, _ := pdi.UEIPAddress()
+	if (SDFFilter != nil) || (UEIPAddress != nil) {
 		if isGTP {
 			// get ip packet to apply filters
 			var h message.Header
@@ -307,14 +324,16 @@ func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byt
 			packet = h.Payload
 		}
 		var err error
-		if pdi.UEIPAddress != nil {
-			res, err = checkUEIPAddress(pdi.UEIPAddress.IPAddress, pdi.SourceInterface, packet)
+
+		SourceInterface, _ := pdi.SourceInterface()
+		if UEIPAddress != nil {
+			res, err = checkUEIPAddress(UEIPAddress, SourceInterface, packet)
 			if (err != nil) || !res {
 				return false
 			}
 		}
-		if pdi.SDFFilter != nil {
-			res, err = checkIPFilterRule(pdi.SDFFilter.FlowDescription, pdi.SourceInterface, packet)
+		if SDFFilter != nil {
+			res, err = checkIPFilterRule(SDFFilter.FlowDescription, SourceInterface, packet)
 			if (err != nil) || !res {
 				return false
 			}
@@ -323,7 +342,7 @@ func isPDIMatching(isGTP bool, pdi *PDI, teid uint32, iface string, packet []byt
 	return true
 }
 
-func checkUEIPAddress(ueipaddress string, sourceInterface string, pdu []byte) (res bool, err error) {
+func checkUEIPAddress(ueipaddress *ie.UEIPAddressFields, sourceInterface uint8, pdu []byte) (res bool, err error) {
 	var srcpdu net.IP
 	var dstpdu net.IP
 	if waterutil.IsIPv4(pdu) {
@@ -337,26 +356,35 @@ func checkUEIPAddress(ueipaddress string, sourceInterface string, pdu []byte) (r
 	} else {
 		return false, fmt.Errorf("PDU is not IPv4 or IPv6")
 	}
-	ueIp := net.ParseIP(ueipaddress)
-	if ueIp == nil {
+	if ueipaddress == nil {
 		return false, fmt.Errorf("Invalid UE IP Address")
 	}
-	if sourceInterface == "Access" {
+	if sourceInterface == ie.SrcInterfaceAccess {
 		// check ip src field
-		if ueIp.Equal(srcpdu) {
+		// XXX: no method HasIPv4() in ue-ip-address.go
+		if ((ueipaddress.Flags&0x02)>>1 == 1) && ueipaddress.IPv4Address.Equal(srcpdu) {
+			return true, nil
+		}
+		// XXX: no method HasIPv6() in ue-ip-address.go
+		if ((ueipaddress.Flags & 0x01) == 1) && ueipaddress.IPv6Address.Equal(srcpdu) {
 			return true, nil
 		}
 	} else {
 		// check ip dst field
-		if ueIp.Equal(dstpdu) {
+		// XXX: no method HasIPv4() in ue-ip-address.go
+		if ((ueipaddress.Flags&0x02)>>1 == 1) && ueipaddress.IPv4Address.Equal(dstpdu) {
+			return true, nil
+		}
+		// XXX: no method HasIPv6() in ue-ip-address.go
+		if ((ueipaddress.Flags & 0x01) == 1) && ueipaddress.IPv6Address.Equal(dstpdu) {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func checkIPFilterRule(rule string, sourceInterface string, pdu []byte) (res bool, err error) {
-	if sourceInterface != "Access" {
+func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool, err error) {
+	if sourceInterface != ie.SrcInterfaceAccess {
 		return false, fmt.Errorf("IP Filter Rule is only implemented for when source interface is ACCESS")
 	}
 	// IP Filter rule is specified in clause 5.4.2 of 3GPP TS 29.212

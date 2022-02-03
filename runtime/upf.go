@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 
 	pfcp_networking "github.com/louisroyer/go-pfcp-networking"
@@ -18,6 +17,7 @@ import (
 
 var Upf *UpfConfig
 var TUNInterface *water.Interface
+var PFCPServer *pfcp_networking.PFCPServerEntity
 
 func Run() error {
 	err := createPFCPNode()
@@ -43,25 +43,13 @@ func Run() error {
 }
 
 func createPFCPNode() error {
-	log.Println("Creating PFCP sessions from config file")
-	log.Println("Generating initial sort for PDRs of PFCP sessions")
-	for _, session := range Upf.PFCPSessions {
-		sort.Sort(PDRs(session.PDRS))
-	}
 	if Upf.SimulateRAN == nil {
 		if Upf.PFCPAddress == nil {
 			return fmt.Errorf("Missing pfcp address")
 		}
-		PFCPServer := pfcp_networking.NewPFCPServerEntity(*Upf.PFCPAddress)
+		PFCPServer = pfcp_networking.NewPFCPServerEntity(*Upf.PFCPAddress)
 		PFCPServer.Start()
 	}
-	go func() error {
-		for {
-			select {}
-		}
-		// TODO: to add a real PFCP server, at each PDR added we need to sort PDRs of the current session
-		return nil
-	}()
 	return nil
 }
 

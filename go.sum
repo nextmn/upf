@@ -90,6 +90,14 @@ github.com/louisroyer/go-pfcp-networking v0.0.12 h1:ayC37rYxZDAAeYHCVYuwRTJ1qSk8
 github.com/louisroyer/go-pfcp-networking v0.0.12/go.mod h1:c4mRgI1f4UEFqPIr9rSL5tfRbSL3Ns3fq4spVnmNUIM=
 github.com/louisroyer/go-pfcp-networking v0.0.13 h1:GSJeli0A0aE1/Jeyk/P+wZiMWHd5p6UTflHOsj5pvqg=
 github.com/louisroyer/go-pfcp-networking v0.0.13/go.mod h1:c4mRgI1f4UEFqPIr9rSL5tfRbSL3Ns3fq4spVnmNUIM=
+github.com/louisroyer/go-pfcp-networking v0.0.14 h1:Qn2qcXnpgoTn1fYEhz9V5V5bc+fC+V4v/DSOIk3mBxw=
+github.com/louisroyer/go-pfcp-networking v0.0.14/go.mod h1:c4mRgI1f4UEFqPIr9rSL5tfRbSL3Ns3fq4spVnmNUIM=
+github.com/louisroyer/go-pfcp-networking v0.0.15 h1:dakaOix3/YkgbVOhZ1NE87mOuz3ZTfcrTlJRijU22To=
+github.com/louisroyer/go-pfcp-networking v0.0.15/go.mod h1:c4mRgI1f4UEFqPIr9rSL5tfRbSL3Ns3fq4spVnmNUIM=
+github.com/louisroyer/go-pfcp-networking v0.0.16 h1:opAm5CULHBBmKvfFuyAE/WC51Wb4wPRuPTmJ3VERw4E=
+github.com/louisroyer/go-pfcp-networking v0.0.16/go.mod h1:c4mRgI1f4UEFqPIr9rSL5tfRbSL3Ns3fq4spVnmNUIM=
+github.com/louisroyer/go-pfcp-networking v0.0.17 h1:mmQxyESShukfI97P+JW64gRS27nS74CG7mOg6vdOk9o=
+github.com/louisroyer/go-pfcp-networking v0.0.17/go.mod h1:c4mRgI1f4UEFqPIr9rSL5tfRbSL3Ns3fq4spVnmNUIM=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
