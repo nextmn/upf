@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
+	pfcp_networking "github.com/louisroyer/go-pfcp-networking"
 	"github.com/songgao/water"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
-	"github.com/louisroyer/go-pfcp-networking"
 )
 
 var Upf *UpfConfig
