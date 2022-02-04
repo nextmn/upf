@@ -18,6 +18,7 @@ import (
 var Upf *UpfConfig
 var TUNInterface *water.Interface
 var PFCPServer *pfcp_networking.PFCPServerEntity
+var FarUconnDb *FARAssociationDB = NewFARAssociationDB()
 
 func Run() error {
 	err := createPFCPNode()
@@ -66,7 +67,7 @@ func createTUNInterface() error {
 			if err != nil {
 				return err
 			}
-			go ipPacketHandler(packet[:n])
+			go ipPacketHandler(packet[:n], FarUconnDb)
 		}
 		return nil
 	}()
@@ -114,7 +115,7 @@ func createGtpUProtocolEntity(ipAddress string) error {
 	defer cancel()
 	uConn.DisableErrorIndication()
 	uConn.AddHandler(message.MsgTypeTPDU, func(c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
-		return tpduHandler(ipAddress, c, senderAddr, msg)
+		return tpduHandler(ipAddress, c, senderAddr, msg, FarUconnDb)
 	})
 	if err := uConn.ListenAndServe(ctx); err != nil {
 		return err

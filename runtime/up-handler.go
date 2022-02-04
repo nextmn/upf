@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -17,7 +18,37 @@ import (
 	"github.com/wmnsk/go-pfcp/ie"
 )
 
-func ipPacketHandler(packet []byte) error {
+type FARAssociationDB struct {
+	table map[uint64]map[uint32]*gtpv1.UPlaneConn
+	mu    sync.Mutex
+}
+
+func NewFARAssociationDB() *FARAssociationDB {
+	return &FARAssociationDB{
+		table: make(map[uint64]map[uint32]*gtpv1.UPlaneConn),
+		mu:    sync.Mutex{},
+	}
+}
+
+func (db *FARAssociationDB) Add(seid uint64, farid uint32, uConn *gtpv1.UPlaneConn) {
+	db.mu.Lock()
+	if _, ok := db.table[seid]; !ok {
+		db.table[seid] = make(map[uint32]*gtpv1.UPlaneConn)
+	}
+	db.table[seid][farid] = uConn
+	db.mu.Unlock()
+}
+
+func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
+	if t, ok := db.table[seid]; ok {
+		if tb, okb := t[farid]; okb {
+			return tb
+		}
+	}
+	return nil
+}
+
+func ipPacketHandler(packet []byte, db *FARAssociationDB) error {
 	//log.Println("Received IP packet on TUN interface")
 	pfcpSessions := getPFCPSessionsIP(packet)
 	pfcpSession, pdr, err := findPDR(pfcpSessions, false, 0, "", packet)
@@ -25,11 +56,11 @@ func ipPacketHandler(packet []byte) error {
 		log.Println("Could not find PDR for IP packet on TUN interface")
 		return err
 	}
-	handleIncommingPacket(packet, false, pfcpSession, pdr)
+	handleIncommingPacket(db, packet, false, pfcpSession, pdr)
 	return nil
 }
 
-func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
+func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB) error {
 	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
 	packet := make([]byte, msg.MarshalLen())
 	err := msg.MarshalTo(packet)
@@ -44,7 +75,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		return err
 	}
 	//log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
-	handleIncommingPacket(packet, true, pfcpSession, pdr)
+	handleIncommingPacket(db, packet, true, pfcpSession, pdr)
 	return nil
 }
 
@@ -122,7 +153,7 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(packet []byte, isGTP bool, session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR) (err error) {
+func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR) (err error) {
 	//log.Println("Start handling of packet PDR:", pdr.ID)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
@@ -180,7 +211,34 @@ func handleIncommingPacket(packet []byte, isGTP bool, session *pfcp_networking.P
 		}
 		gtpuPort := "2152"
 		var udpaddr string
-		ipAddress := far.ForwardingParameters.OuterHeaderCreation.GTPUPeer // TODO: IPv4Address / IPv6Address
+
+		var ipAddress string
+		switch {
+		case ((ohcfields.OuterHeaderCreationDescription & 0x0100) >> 8) == 0x01: // GTP-U/UDP/IPv4
+			if ohc.HasIPv4() {
+				ipAddress = ohcfields.IPv4Address.String()
+				break
+			}
+			fallthrough
+		case ((ohcfields.OuterHeaderCreationDescription & 0x0200) >> 9) == 0x01: // GTP-U/UDP/IPv6
+			if ohc.HasIPv6() {
+				ipAddress = ohcfields.IPv6Address.String()
+				break
+			}
+			fallthrough
+
+		case ((ohcfields.OuterHeaderCreationDescription & 0x0400) >> 10) == 0x01: // UDP/IPv4
+			fallthrough
+		case ((ohcfields.OuterHeaderCreationDescription & 0x0800) >> 11) == 0x01: // UDP/IPv6
+			fallthrough
+		case ((ohcfields.OuterHeaderCreationDescription & 0x1000) >> 12) == 0x01: // IPv4
+			fallthrough
+		case ((ohcfields.OuterHeaderCreationDescription & 0x2000) >> 13) == 0x01: // IPv6
+			fallthrough
+		default:
+			return fmt.Errorf("Unsupported option in Outer Header Creation Description")
+
+		}
 		if strings.Count(ipAddress, ":") > 0 {
 			udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, gtpuPort)
 		} else {
@@ -192,7 +250,12 @@ func handleIncommingPacket(packet []byte, isGTP bool, session *pfcp_networking.P
 			return err
 		}
 		// Check Uconn exists for this FAR
-		if far.ForwardingParameters.OuterHeaderCreation.uConn == nil {
+		seid, err := session.SEID()
+		if err != nil {
+			return err
+		}
+		uConn := db.Get(seid, farid)
+		if uConn == nil {
 			// Open new uConn
 			// TS 129 281 V16.2.0, section 4.4.2.0:
 			// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
@@ -208,13 +271,13 @@ func handleIncommingPacket(packet []byte, isGTP bool, session *pfcp_networking.P
 			go func(ch chan bool) error {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				uConn, err := gtpv1.DialUPlane(ctx, laddr, raddr)
+				uConn, err = gtpv1.DialUPlane(ctx, laddr, raddr)
 				if err != nil {
 					log.Println("Dial failure")
 					return err
 				}
 				defer uConn.Close()
-				far.ForwardingParameters.OuterHeaderCreation.uConn = uConn
+				db.Add(seid, farid, uConn)
 				close(ch)
 				for {
 					select {}
@@ -227,7 +290,7 @@ func handleIncommingPacket(packet []byte, isGTP bool, session *pfcp_networking.P
 			return err
 		}
 		log.Println("Forwarding gpdu to", raddr)
-		far.ForwardingParameters.OuterHeaderCreation.uConn.WriteTo(b, raddr)
+		uConn.WriteTo(b, raddr)
 	} else {
 		// forward using TUN interface
 		log.Println("Forwarding gpdu to tun interface")
@@ -345,6 +408,7 @@ func isPDIMatching(isGTP bool, pdi *ie.IE, teid uint32, iface string, packet []b
 func checkUEIPAddress(ueipaddress *ie.UEIPAddressFields, sourceInterface uint8, pdu []byte) (res bool, err error) {
 	var srcpdu net.IP
 	var dstpdu net.IP
+	ueIpAddressIE := ie.NewUEIPAddress(ueipaddress.Flags, ueipaddress.IPv4Address.String(), ueipaddress.IPv6Address.String(), ueipaddress.IPv6PrefixDelegationBits, ueipaddress.IPv6PrefixLength)
 	if waterutil.IsIPv4(pdu) {
 		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
 		srcpdu = p.SrcIP
@@ -361,22 +425,18 @@ func checkUEIPAddress(ueipaddress *ie.UEIPAddressFields, sourceInterface uint8, 
 	}
 	if sourceInterface == ie.SrcInterfaceAccess {
 		// check ip src field
-		// XXX: no method HasIPv4() in ue-ip-address.go
-		if ((ueipaddress.Flags&0x02)>>1 == 1) && ueipaddress.IPv4Address.Equal(srcpdu) {
+		if ueIpAddressIE.HasIPv4() && ueipaddress.IPv4Address.Equal(srcpdu) {
 			return true, nil
 		}
-		// XXX: no method HasIPv6() in ue-ip-address.go
-		if ((ueipaddress.Flags & 0x01) == 1) && ueipaddress.IPv6Address.Equal(srcpdu) {
+		if ueIpAddressIE.HasIPv6() && ueipaddress.IPv6Address.Equal(srcpdu) {
 			return true, nil
 		}
 	} else {
 		// check ip dst field
-		// XXX: no method HasIPv4() in ue-ip-address.go
-		if ((ueipaddress.Flags&0x02)>>1 == 1) && ueipaddress.IPv4Address.Equal(dstpdu) {
+		if ueIpAddressIE.HasIPv4() && ueipaddress.IPv4Address.Equal(dstpdu) {
 			return true, nil
 		}
-		// XXX: no method HasIPv6() in ue-ip-address.go
-		if ((ueipaddress.Flags & 0x01) == 1) && ueipaddress.IPv6Address.Equal(dstpdu) {
+		if ueIpAddressIE.HasIPv6() && ueipaddress.IPv6Address.Equal(dstpdu) {
 			return true, nil
 		}
 	}
