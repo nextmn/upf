@@ -20,6 +20,9 @@ services:
       net1:
         ipv4_address: 10.0.10.2
         ipv6_address: fd00:d0cc:e700:1111:1::2
+      cp:
+        ipv4_address: 10.0.60.5
+        ipv6_address: fd00:d0cc:e700:1111:6::5
   ran-2:
     container_name: ran-2
     hostname: ran-2
@@ -40,6 +43,9 @@ services:
       net1:
         ipv4_address: 10.0.10.4
         ipv6_address: fd00:d0cc:e700:1111:1::4
+      cp:
+        ipv4_address: 10.0.60.6
+        ipv6_address: fd00:d0cc:e700:1111:6::6
   upf-1:
     container_name: upf-1 
     hostname: upf-1 

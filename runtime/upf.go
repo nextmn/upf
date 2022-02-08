@@ -44,13 +44,11 @@ func Run() error {
 }
 
 func createPFCPNode() error {
-	if Upf.SimulateRAN == nil {
-		if Upf.PFCPAddress == nil {
-			return fmt.Errorf("Missing pfcp address")
-		}
-		PFCPServer = pfcp_networking.NewPFCPServerEntity(*Upf.PFCPAddress)
-		PFCPServer.Start()
+	if Upf.PFCPAddress == nil {
+		return fmt.Errorf("Missing pfcp address")
 	}
+	PFCPServer = pfcp_networking.NewPFCPServerEntity(*Upf.PFCPAddress)
+	PFCPServer.Start()
 	return nil
 }
 
