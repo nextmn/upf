@@ -2,13 +2,12 @@ prefix = /usr/local
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 BASHCOMPLETIONSDIR = $(exec_prefix)/share/bash-completion/completions
-TAB := $(NULL)<tab>$(NULL)
 
 
 RM = rm -f
 INSTALL = install -D
 
-.PHONY: install uninstall  build clean default
+.PHONY: install uninstall update build clean default
 default: build
 build:
 	go build
