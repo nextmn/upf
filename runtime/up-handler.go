@@ -117,7 +117,7 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 		for _, eh := range h.ExtensionHeaders {
 			switch eh.Type {
 			case message.ExtHeaderTypePDUSessionContainer:
-				deletion, _ := outerHeaderRemoval.GTPUExternsionHeaderDeletion()
+				deletion, _ := outerHeaderRemoval.GTPUExtensionHeaderDeletion()
 				if (deletion & 0x01) != 1 {
 					headers_tmp = append(headers_tmp, message.NewExtensionHeader(eh.Type, eh.Content, message.ExtHeaderTypeNoMoreExtensionHeaders))
 				}
