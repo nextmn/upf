@@ -193,8 +193,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		log.Println("Missing forward action for FAR", farid)
 	}
 
-	fp, _ := far.ForwardingParameters()
-	ohcfields, _ := ie.NewForwardingParameters(fp...).OuterHeaderCreation()
+	ohcfields, _ := far.ForwardingParameters().OuterHeaderCreation()
 
 	if ohcfields != nil {
 		// XXX: No method in go-pfcp to convert OuterHeaderCreationFields directly to ie.IE
@@ -218,6 +217,8 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			}
 			return forwardGTP(gpdu, ipAddress, session, farid, db)
 		// XXX: No method in go-pfcp to check if field Port Number is present
+		// With PR #102 ->
+		// case ohc.HasPortNumber():
 		case ohcfields.OuterHeaderCreationDescription&(0x0400|0x0800) > 0:
 			// forward over UDP/IP
 			port := ohcfields.PortNumber
