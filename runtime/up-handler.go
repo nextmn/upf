@@ -200,97 +200,58 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		// XXX: No method in go-pfcp to convert OuterHeaderCreationFields directly to ie.IE
 		ohcb, _ := ohcfields.Marshal()
 		ohc := ie.New(ie.OuterHeaderCreation, ohcb)
-		// Apply TEID parameter and set back GTP Extension Headers
-		if !ohc.HasTEID() {
-			return fmt.Errorf("Missing TEID in Outer Header CReation")
-		}
-
-		gpdu := message.NewHeaderWithExtensionHeaders(0x30, message.MsgTypeTPDU, ohcfields.TEID, 0, packet, gtpHeaders...)
-		if err != nil {
-			return err
-		}
-		gtpuPort := "2152"
-		var udpaddr string
 
 		var ipAddress string
 		switch {
-		case ((ohcfields.OuterHeaderCreationDescription & 0x0100) >> 8) == 0x01: // GTP-U/UDP/IPv4
-			if ohc.HasIPv4() {
-				ipAddress = ohcfields.IPv4Address.String()
-				break
-			}
-			fallthrough
-		case ((ohcfields.OuterHeaderCreationDescription & 0x0200) >> 9) == 0x01: // GTP-U/UDP/IPv6
-			if ohc.HasIPv6() {
-				ipAddress = ohcfields.IPv6Address.String()
-				break
-			}
-			fallthrough
-
-		case ((ohcfields.OuterHeaderCreationDescription & 0x0400) >> 10) == 0x01: // UDP/IPv4
-			fallthrough
-		case ((ohcfields.OuterHeaderCreationDescription & 0x0800) >> 11) == 0x01: // UDP/IPv6
-			fallthrough
-		case ((ohcfields.OuterHeaderCreationDescription & 0x1000) >> 12) == 0x01: // IPv4
-			fallthrough
-		case ((ohcfields.OuterHeaderCreationDescription & 0x2000) >> 13) == 0x01: // IPv6
-			fallthrough
+		case ohc.HasIPv6():
+			ipAddress = ohcfields.IPv6Address.String()
+		case ohc.HasIPv4():
+			ipAddress = ohcfields.IPv4Address.String()
 		default:
-			return fmt.Errorf("Unsupported option in Outer Header Creation Description")
-
+			ipAddress = ""
 		}
-		if strings.Count(ipAddress, ":") > 0 {
-			udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, gtpuPort)
-		} else {
-			udpaddr = fmt.Sprintf("%s:%s", ipAddress, gtpuPort)
-		}
-		raddr, err := net.ResolveUDPAddr("udp", udpaddr)
-		if err != nil {
-			log.Println("Error while resolving UDP address of GTP-U Peer")
-			return err
-		}
-		// Check Uconn exists for this FAR
-		seid, err := session.SEID()
-		if err != nil {
-			return err
-		}
-		uConn := db.Get(seid, farid)
-		if uConn == nil {
-			// Open new uConn
-			// TS 129 281 V16.2.0, section 4.4.2.0:
-			// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
-			// Port or the Flow Label field (see IETF RFC 6437 [37]) should be set dynamically by the sending GTP-U entity to help
-			// balancing the load in the transport network.
-			c, err := net.Dial("udp", udpaddr)
+		switch {
+		case ohc.HasTEID(): // Outer Header Creation
+			gpdu := message.NewHeaderWithExtensionHeaders(0x30, message.MsgTypeTPDU, ohcfields.TEID, 0, packet, gtpHeaders...)
 			if err != nil {
 				return err
 			}
-			c.Close()
-			laddr := c.LocalAddr().(*net.UDPAddr)
-			ch := make(chan bool)
-			go func(ch chan bool) error {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				uConn, err = gtpv1.DialUPlane(ctx, laddr, raddr)
-				if err != nil {
-					log.Println("Dial failure")
-					return err
-				}
-				defer uConn.Close()
-				db.Add(seid, farid, uConn)
-				close(ch)
-				for {
-					select {}
-				}
-			}(ch)
-			_ = <-ch
+			return forwardGTP(gpdu, ipAddress, session, farid, db)
+		// XXX: No method in go-pfcp to check if field Port Number is present
+		case ohcfields.OuterHeaderCreationDescription&(0x0400|0x0800) > 0:
+			// forward over UDP/IP
+			port := ohcfields.PortNumber
+			var udpaddr string
+			if strings.Count(ipAddress, ":") > 0 {
+				udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, port)
+			} else {
+				udpaddr = fmt.Sprintf("%s:%s", ipAddress, port)
+			}
+			raddr, err := net.ResolveUDPAddr("udp", udpaddr)
+			if err != nil {
+				return err
+			}
+			udpConn, err := net.DialUDP("udp", nil, raddr)
+			if err != nil {
+				return err
+			}
+			defer udpConn.Close()
+			udpConn.Write(packet)
+		case ohc.HasIPv4() || ohc.HasIPv6():
+			// forward over IPv4
+			raddr, err := net.ResolveIPAddr("ip", ipAddress)
+			if err != nil {
+				return err
+			}
+			ipConn, err := net.DialIP("ip", nil, raddr)
+			if err != nil {
+				return err
+			}
+			defer ipConn.Close()
+			ipConn.Write(packet)
+		default:
+			return fmt.Errorf("Unsupported option in Outer Header Creation Description")
 		}
-		b, err := gpdu.Marshal()
-		if err != nil {
-			return err
-		}
-		log.Println("Forwarding gpdu to", raddr)
-		uConn.WriteTo(b, raddr)
 	} else {
 		// forward using TUN interface
 		log.Println("Forwarding gpdu to tun interface")
@@ -298,6 +259,66 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 	}
 	return nil
 
+}
+
+func forwardGTP(gpdu *message.Header, ipAddress string, session *pfcp_networking.PFCPSession, farid uint32, db *FARAssociationDB) error {
+	if ipAddress == "" {
+		return fmt.Errorf("IP Address for GTP Forwarding is empty")
+	}
+	var udpaddr string
+	if strings.Count(ipAddress, ":") > 0 {
+		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, GTPU_PORT)
+	} else {
+		udpaddr = fmt.Sprintf("%s:%s", ipAddress, GTPU_PORT)
+	}
+	raddr, err := net.ResolveUDPAddr("udp", udpaddr)
+	if err != nil {
+		log.Println("Error while resolving UDP address of GTP-U Peer")
+		return err
+	}
+	// Check Uconn exists for this FAR
+	seid, err := session.SEID()
+	if err != nil {
+		return err
+	}
+	uConn := db.Get(seid, farid)
+	if uConn == nil {
+		// Open new uConn
+		// TS 129 281 V16.2.0, section 4.4.2.0:
+		// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
+		// Port or the Flow Label field (see IETF RFC 6437 [37]) should be set dynamically by the sending GTP-U entity to help
+		// balancing the load in the transport network.
+		c, err := net.Dial("udp", udpaddr)
+		if err != nil {
+			return err
+		}
+		c.Close()
+		laddr := c.LocalAddr().(*net.UDPAddr)
+		ch := make(chan bool)
+		go func(ch chan bool) error {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			uConn, err = gtpv1.DialUPlane(ctx, laddr, raddr)
+			if err != nil {
+				log.Println("Dial failure")
+				return err
+			}
+			defer uConn.Close()
+			db.Add(seid, farid, uConn)
+			close(ch)
+			for {
+				select {}
+			}
+		}(ch)
+		_ = <-ch
+	}
+	b, err := gpdu.Marshal()
+	if err != nil {
+		return err
+	}
+	log.Println("Forwarding gpdu to", raddr)
+	uConn.WriteTo(b, raddr)
+	return nil
 }
 
 func findPDR(sessions []*pfcp_networking.PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR, err error) {

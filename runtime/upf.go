@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	pfcp_networking "github.com/louisroyer/go-pfcp-networking"
@@ -60,7 +61,7 @@ func createTUNInterface() error {
 	go func() error {
 
 		for {
-			packet := make([]byte, 1400)
+			packet := make([]byte, MTU_GTP_TUN)
 			n, err := TUNInterface.Read(packet)
 			if err != nil {
 				return err
@@ -95,12 +96,11 @@ func createGTPUProtocolEntities() error {
 
 func createGtpUProtocolEntity(ipAddress string) error {
 	fmt.Println("Creating new GTP-U Protocol Entity on", ipAddress)
-	gtpuPort := "2152"
 	var udpaddr string
 	if strings.Count(ipAddress, ":") > 0 {
-		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, gtpuPort)
+		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, GTPU_PORT)
 	} else {
-		udpaddr = fmt.Sprintf("%s:%s", ipAddress, gtpuPort)
+		udpaddr = fmt.Sprintf("%s:%s", ipAddress, GTPU_PORT)
 	}
 	laddr, err := net.ResolveUDPAddr("udp", udpaddr)
 	if err != nil {
@@ -199,7 +199,7 @@ func createTun() error {
 		log.Println("Unable to allocate TUN interface:", err)
 		return err
 	}
-	err = runIP("link", "set", "dev", iface.Name(), "mtu", "1400")
+	err = runIP("link", "set", "dev", iface.Name(), "mtu", strconv.Itoa(MTU_GTP_TUN))
 	if nil != err {
 		log.Println("Unable to set MTU for", iface.Name())
 		return err
