@@ -215,7 +215,12 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			if err != nil {
 				return err
 			}
-			return forwardGTP(gpdu, ipAddress, session, farid, db)
+			tlm, err := far.ForwardingParameters().TransportLevelMarking()
+			if err == nil {
+				return forwardGTP(gpdu, ipAddress, int(tlm>>8), session, farid, db)
+			} else {
+				return forwardGTP(gpdu, ipAddress, 0, session, farid, db)
+			}
 		// XXX: No method in go-pfcp to check if field Port Number is present
 		// With PR #102 ->
 		// case ohc.HasPortNumber():
@@ -262,7 +267,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 
 }
 
-func forwardGTP(gpdu *message.Header, ipAddress string, session *pfcp_networking.PFCPSession, farid uint32, db *FARAssociationDB) error {
+func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session *pfcp_networking.PFCPSession, farid uint32, db *FARAssociationDB) error {
 	if ipAddress == "" {
 		return fmt.Errorf("IP Address for GTP Forwarding is empty")
 	}
@@ -318,7 +323,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, session *pfcp_networking
 		return err
 	}
 	log.Println("Forwarding gpdu to", raddr)
-	uConn.WriteTo(b, raddr)
+	uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
 	return nil
 }
 
