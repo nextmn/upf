@@ -203,8 +203,9 @@ github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYp
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 h1:gga7acRE695APm9hlsSMoOoE65U4/TcqNj90mc69Rlg=
 github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
-github.com/wmnsk/go-pfcp v0.0.16-0.20220213111343-978f0352d837 h1:re+9mRMZZ8tXr5S37vWsbdYeUyKJGgWmZ9SXHp+6erw=
 github.com/wmnsk/go-pfcp v0.0.16-0.20220213111343-978f0352d837/go.mod h1:vAimwm1IQ2Lu3OtuWmGl52YBZu9kHjPxtFRTlSJ/bdU=
+github.com/wmnsk/go-pfcp v0.0.16-0.20220223072317-a196791a1e2c h1:1UwDrZ98zrHvsJOUceeKRT7GXaw85Fa1wIYErbrM7lc=
+github.com/wmnsk/go-pfcp v0.0.16-0.20220223072317-a196791a1e2c/go.mod h1:vAimwm1IQ2Lu3OtuWmGl52YBZu9kHjPxtFRTlSJ/bdU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

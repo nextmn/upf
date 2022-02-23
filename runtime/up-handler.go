@@ -211,6 +211,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		}
 		switch {
 		case ohc.HasTEID(): // Outer Header Creation
+			// forward over GTP/UDP/IP
 			gpdu := message.NewHeaderWithExtensionHeaders(0x30, message.MsgTypeTPDU, ohcfields.TEID, 0, packet, gtpHeaders...)
 			if err != nil {
 				return err
@@ -221,10 +222,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			} else {
 				return forwardGTP(gpdu, ipAddress, 0, session, farid, db)
 			}
-		// XXX: No method in go-pfcp to check if field Port Number is present
-		// With PR #102 ->
-		// case ohc.HasPortNumber():
-		case ohcfields.OuterHeaderCreationDescription&(0x0400|0x0800) > 0:
+		case ohc.HasPortNumber():
 			// forward over UDP/IP
 			port := ohcfields.PortNumber
 			var udpaddr string
@@ -244,7 +242,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			defer udpConn.Close()
 			udpConn.Write(packet)
 		case ohc.HasIPv4() || ohc.HasIPv6():
-			// forward over IPv4
+			// forward over IP
 			raddr, err := net.ResolveIPAddr("ip", ipAddress)
 			if err != nil {
 				return err
