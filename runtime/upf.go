@@ -194,6 +194,9 @@ func createTun() error {
 	config := water.Config{
 		DeviceType: water.TUN,
 	}
+	if Upf.TunInterface != nil {
+		config.Name = *Upf.TunInterface
+	}
 	iface, err := water.New(config)
 	if nil != err {
 		log.Println("Unable to allocate TUN interface:", err)

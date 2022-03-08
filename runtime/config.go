@@ -32,6 +32,7 @@ type RAN struct {
 
 type UpfConfig struct {
 	PFCPAddress          *string  `yaml:"pfcp-address,omitempty"`
+	TunInterface         *string  `yaml:"tun-interface,omitempty"`
 	GTPUProtocolEntities []string `yaml:"gtpu-entities"`
 	DNNList              []*DNN   `yaml:"dnn_list,omitempty"`
 	SimulateRAN          *RAN     `yaml:"simulate-ran,omitempty"`
