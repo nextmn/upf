@@ -78,7 +78,7 @@ func createDLRoutes() error {
 		return nil
 	}
 	for _, ue := range Upf.DNNList {
-		err := runIP("route", "add", ue.Cidr, "dev", TUNInterface.Name())
+		err := runIP("route", "add", ue.Cidr, "dev", TUNInterface.Name(), "proto", "static")
 		if err != nil {
 			log.Println("Cannot create Uplink route for", ue.Cidr)
 			return err
