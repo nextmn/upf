@@ -40,8 +40,8 @@ func (db *FARAssociationDB) Add(seid uint64, farid uint32, uConn *gtpv1.UPlaneCo
 }
 
 func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
-	if t, ok := db.table[seid]; ok {
-		if tb, okb := t[farid]; okb {
+	if ta, oka := db.table[seid]; oka {
+		if tb, okb := ta[farid]; okb {
 			return tb
 		}
 	}
@@ -281,7 +281,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session *pf
 		return err
 	}
 	// Check Uconn exists for this FAR
-	seid, err := session.SEID()
+	seid, err := session.LocalSEID()
 	if err != nil {
 		return err
 	}

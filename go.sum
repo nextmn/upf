@@ -146,8 +146,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/louisroyer/go-pfcp-networking v0.0.18 h1:PWAircylP2ZBTC7JaQqktdYnVfntHSU+abJUu4CVbnA=
-github.com/louisroyer/go-pfcp-networking v0.0.18/go.mod h1:7/ZyIaAeY06dggm7M9mLMnFw4IfsST+C9EGcFBJgRyo=
+github.com/louisroyer/go-pfcp-networking v0.0.19-0.20220517153724-997bf007b587 h1:fgLy+WUw9Q281uKjsa5aUfC1iJ1nMd7tm5bfOq2GlhI=
+github.com/louisroyer/go-pfcp-networking v0.0.19-0.20220517153724-997bf007b587/go.mod h1:bgGhOzDpK8Y7KMpEujb4NHs3zIb0cXemmlrKeZQ19ks=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -204,7 +204,6 @@ github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 h1:gga7acRE695AP
 github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
 github.com/wmnsk/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a h1:bgrNLdvxK1r16/BQ5GiCvfgZYNKuYtMjX/1qWgw/4+E=
 github.com/wmnsk/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a/go.mod h1:Z29+CDu0G2n8hRZzSYHiZPxMR60ddUWFgs9gUYF80bE=
-github.com/wmnsk/go-pfcp v0.0.16-0.20220223072317-a196791a1e2c/go.mod h1:vAimwm1IQ2Lu3OtuWmGl52YBZu9kHjPxtFRTlSJ/bdU=
 github.com/wmnsk/go-pfcp v0.0.16-0.20220415105220-d1e74d0d7288 h1:dCaIsNAUlpMYHlnXH/6faYlrI2PcunU/s/7mECWYFJo=
 github.com/wmnsk/go-pfcp v0.0.16-0.20220415105220-d1e74d0d7288/go.mod h1:kp6if8K1n+6VGNodtkuPn1i9PxIKIymCfocOE2Y34Qk=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
