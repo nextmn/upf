@@ -106,8 +106,9 @@ github.com/google/go-cmp v0.4.1/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.1/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
-github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/google/go-cmp v0.5.7 h1:81/ik6ipDQS2aGcBfIN5dHDB36BwrStyeAQquSYCV4o=
+github.com/google/go-cmp v0.5.7/go.mod h1:n+brtR0CgQNWTVd5ZUFpTBC8YFBDLK/h/bpaJ8/DtOE=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/gopacket v1.1.19 h1:ves8RnFZPGiFnTS0uPQStjwru6uO6h+nlr9j6fL7kF8=
 github.com/google/gopacket v1.1.19/go.mod h1:iJ8V8n6KS+z2U1A8pUwu8bW5SyEMkXJB8Yo/Vo+TKTo=
@@ -145,10 +146,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/louisroyer/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a h1:3Ke7WnFvK7XFoKZmCgEoowxm82z8Z3om0jYDmguk5J0=
-github.com/louisroyer/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a/go.mod h1:Z29+CDu0G2n8hRZzSYHiZPxMR60ddUWFgs9gUYF80bE=
-github.com/louisroyer/go-pfcp-networking v0.0.18-0.20220214135144-6cd5708f1e43 h1:mD7OLws7hNxM1wtgvoG8VS2Ufz953tZjVYSTNp5xWQc=
-github.com/louisroyer/go-pfcp-networking v0.0.18-0.20220214135144-6cd5708f1e43/go.mod h1:PAUM1WkDXHfB9gAKCpzMuJojZ3QoxQHp+LKF813arKI=
+github.com/louisroyer/go-pfcp-networking v0.0.18 h1:PWAircylP2ZBTC7JaQqktdYnVfntHSU+abJUu4CVbnA=
+github.com/louisroyer/go-pfcp-networking v0.0.18/go.mod h1:7/ZyIaAeY06dggm7M9mLMnFw4IfsST+C9EGcFBJgRyo=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -203,9 +202,11 @@ github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYp
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 h1:gga7acRE695APm9hlsSMoOoE65U4/TcqNj90mc69Rlg=
 github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
-github.com/wmnsk/go-pfcp v0.0.16-0.20220213111343-978f0352d837/go.mod h1:vAimwm1IQ2Lu3OtuWmGl52YBZu9kHjPxtFRTlSJ/bdU=
-github.com/wmnsk/go-pfcp v0.0.16-0.20220223072317-a196791a1e2c h1:1UwDrZ98zrHvsJOUceeKRT7GXaw85Fa1wIYErbrM7lc=
+github.com/wmnsk/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a h1:bgrNLdvxK1r16/BQ5GiCvfgZYNKuYtMjX/1qWgw/4+E=
+github.com/wmnsk/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a/go.mod h1:Z29+CDu0G2n8hRZzSYHiZPxMR60ddUWFgs9gUYF80bE=
 github.com/wmnsk/go-pfcp v0.0.16-0.20220223072317-a196791a1e2c/go.mod h1:vAimwm1IQ2Lu3OtuWmGl52YBZu9kHjPxtFRTlSJ/bdU=
+github.com/wmnsk/go-pfcp v0.0.16-0.20220415105220-d1e74d0d7288 h1:dCaIsNAUlpMYHlnXH/6faYlrI2PcunU/s/7mECWYFJo=
+github.com/wmnsk/go-pfcp v0.0.16-0.20220415105220-d1e74d0d7288/go.mod h1:kp6if8K1n+6VGNodtkuPn1i9PxIKIymCfocOE2Y34Qk=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
