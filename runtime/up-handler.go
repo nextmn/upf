@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	pfcp_networking "github.com/louisroyer/go-pfcp-networking"
+	"github.com/louisroyer/go-pfcp-networking/pfcp/api"
 	pfcprule "github.com/louisroyer/go-pfcp-networking/pfcprules"
 	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
@@ -153,7 +153,7 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR) (err error) {
+func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr *pfcprule.PDR) (err error) {
 	//log.Println("Start handling of packet PDR:", pdr.ID)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
@@ -265,7 +265,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 
 }
 
-func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session *pfcp_networking.PFCPSession, farid uint32, db *FARAssociationDB) error {
+func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api.PFCPSessionInterface, farid uint32, db *FARAssociationDB) error {
 	if ipAddress == "" {
 		return fmt.Errorf("IP Address for GTP Forwarding is empty")
 	}
@@ -325,7 +325,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session *pf
 	return nil
 }
 
-func findPDR(sessions []*pfcp_networking.PFCPSession, isGTP bool, teid uint32, iface string, pdu []byte) (session *pfcp_networking.PFCPSession, pdr *pfcprule.PDR, err error) {
+func findPDR(sessions []api.PFCPSessionInterface, isGTP bool, teid uint32, iface string, pdu []byte) (session api.PFCPSessionInterface, pdr *pfcprule.PDR, err error) {
 	// On receipt of a user plane packet, the UP function shall perform a lookup of the provisioned PDRs and:
 	// - identify first the PFCP session to which the packet corresponds; and
 	// - find the first PDR matching the incoming packet, among all the PDRs provisioned for this PFCP session, starting
@@ -344,7 +344,7 @@ func findPDR(sessions []*pfcp_networking.PFCPSession, isGTP bool, teid uint32, i
 	// send these packets to the CP function or to drop them. The UP function shall grant the lowest precedence to this
 	// PDR.
 
-	var sessionWilcard *pfcp_networking.PFCPSession
+	var sessionWilcard api.PFCPSessionInterface
 	var pdrWilcard *pfcprule.PDR
 	for _, session := range sessions {
 		// session.PDRS is already sorted
@@ -380,12 +380,12 @@ func isPDIAllWilcard(pdi *ie.IE) bool {
 	return true
 }
 
-func getPFCPSessionsGTP(msg message.Message) []*pfcp_networking.PFCPSession {
+func getPFCPSessionsGTP(msg message.Message) []api.PFCPSessionInterface {
 	//TODO: filter by PDN Type
 	return PFCPServer.GetPFCPSessions()
 }
 
-func getPFCPSessionsIP(packet []byte) []*pfcp_networking.PFCPSession {
+func getPFCPSessionsIP(packet []byte) []api.PFCPSessionInterface {
 	//TODO: filter by PDN Type
 	return PFCPServer.GetPFCPSessions()
 }

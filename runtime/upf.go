@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	pfcp_networking "github.com/louisroyer/go-pfcp-networking"
+	pfcp_networking "github.com/louisroyer/go-pfcp-networking/pfcp"
 	"github.com/songgao/water"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
@@ -18,7 +18,7 @@ import (
 
 var Upf *UpfConfig
 var TUNInterface *water.Interface
-var PFCPServer *pfcp_networking.PFCPServerEntity
+var PFCPServer *pfcp_networking.PFCPEntityUP
 var FarUconnDb *FARAssociationDB = NewFARAssociationDB()
 
 func Run() error {
@@ -48,7 +48,7 @@ func createPFCPNode() error {
 	if Upf.PFCPAddress == nil {
 		return fmt.Errorf("Missing pfcp address")
 	}
-	PFCPServer = pfcp_networking.NewPFCPServerEntity(*Upf.PFCPAddress)
+	PFCPServer = pfcp_networking.NewPFCPEntityUP(*Upf.PFCPAddress)
 	PFCPServer.Start()
 	return nil
 }
