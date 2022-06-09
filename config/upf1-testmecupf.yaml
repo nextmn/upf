@@ -1,0 +1,8 @@
+pfcp-address: "10.0.210.3"
+tun-interface: upf
+gtpu-entities:
+  - "10.0.216.2" 
+dnn_list:
+  - dnn: "sliceA"
+    cidr: "10.0.222.0/24"
+
