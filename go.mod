@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/google/gopacket v1.1.19
-	github.com/louisroyer/go-pfcp-networking v0.0.23-0.20220615155446-c6ef630f5990
+	github.com/louisroyer/go-pfcp-networking v0.0.23-0.20220615161528-4bce32dab0dc
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 // indirect
