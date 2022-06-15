@@ -11,7 +11,6 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/louisroyer/go-pfcp-networking/pfcp/api"
-	pfcprule "github.com/louisroyer/go-pfcp-networking/pfcprules"
 	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
@@ -32,11 +31,11 @@ func NewFARAssociationDB() *FARAssociationDB {
 
 func (db *FARAssociationDB) Add(seid uint64, farid uint32, uConn *gtpv1.UPlaneConn) {
 	db.mu.Lock()
+	defer db.mu.Unlock()
 	if _, ok := db.table[seid]; !ok {
 		db.table[seid] = make(map[uint32]*gtpv1.UPlaneConn)
 	}
 	db.table[seid][farid] = uConn
-	db.mu.Unlock()
 }
 
 func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
@@ -50,10 +49,30 @@ func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
 
 func ipPacketHandler(packet []byte, db *FARAssociationDB) error {
 	//log.Println("Received IP packet on TUN interface")
-	pfcpSessions := getPFCPSessionsIP(packet)
-	pfcpSession, pdr, err := findPDR(pfcpSessions, false, 0, "", packet)
+	pfcpSession, err := pfcpSessionLookUp(false, 0, "", packet)
 	if err != nil {
-		log.Println("Could not find PDR for IP packet on TUN interface")
+		return err
+	}
+	defer pfcpSession.RUnlock()
+	pdr, err := pfcpSessionPDRLookUp(pfcpSession, false, 0, "", packet)
+	if err != nil {
+		// log debug
+		var srcpdu net.IP
+		var dstpdu net.IP
+		if waterutil.IsIPv4(packet) {
+			p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+			srcpdu = p.SrcIP
+			dstpdu = p.DstIP
+			log.Printf("Could not find PDR for IP packet on TUN interface, src: %s, dst: %s\n", srcpdu.String(), dstpdu.String())
+		} else if waterutil.IsIPv6(packet) {
+			p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+			srcpdu = p.SrcIP
+			dstpdu = p.DstIP
+			log.Printf("Could not find PDR for IP packet on TUN interface, src: %s, dst: %s\n", srcpdu.String(), dstpdu.String())
+		} else {
+			log.Println("Could not find PDR for IP packet on TUN interface")
+		}
+		// end log debug
 		return err
 	}
 	handleIncommingPacket(db, packet, false, pfcpSession, pdr)
@@ -68,8 +87,9 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not marshal gtp packet")
 		return err
 	}
-	pfcpSessions := getPFCPSessionsGTP(msg)
-	pfcpSession, pdr, err := findPDR(pfcpSessions, true, msg.TEID(), iface, packet)
+	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface, packet)
+	defer pfcpSession.RUnlock()
+	pdr, err := pfcpSessionPDRLookUp(pfcpSession, true, msg.TEID(), iface, packet)
 	if err != nil {
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
 		return err
@@ -153,7 +173,7 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr *pfcprule.PDR) (err error) {
+func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface) (err error) {
 	//log.Println("Start handling of packet PDR:", pdr.ID)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
@@ -258,7 +278,24 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		}
 	} else {
 		// forward using TUN interface
-		log.Println("Forwarding gpdu to tun interface")
+		// debug log start
+		var srcpdu net.IP
+		var dstpdu net.IP
+		if waterutil.IsIPv4(packet) {
+			p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+			srcpdu = p.SrcIP
+			dstpdu = p.DstIP
+			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
+		} else if waterutil.IsIPv6(packet) {
+			p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+			srcpdu = p.SrcIP
+			dstpdu = p.DstIP
+			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
+		} else {
+			log.Printf("Forwarding IP packet to TUN interface\n")
+			log.Println("Could not find PDR for IP packet on TUN interface")
+		}
+		// debug log end
 		TUNInterface.Write(packet)
 	}
 	return nil
@@ -320,12 +357,42 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 	if err != nil {
 		return err
 	}
-	log.Println("Forwarding gpdu to", raddr)
+	log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
 	uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
 	return nil
 }
 
-func findPDR(sessions []api.PFCPSessionInterface, isGTP bool, teid uint32, iface string, pdu []byte) (session api.PFCPSessionInterface, pdr *pfcprule.PDR, err error) {
+func checkPFCPSession(session api.PFCPSessionInterface, isGTP bool, teid uint32, iface string, pdu []byte) (bool, bool, error) {
+	isMatching := false
+	isWilcard := false
+	session.RLock()
+	defer func() {
+		if !isMatching {
+			session.RUnlock()
+		}
+	}()
+
+	// no need to use sorted PDRs when identifying sessions
+	err := session.ForeachUnsortedPDR(func(pdr api.PDRInterface) error {
+		pdicontent, err := pdr.PDI()
+		if err != nil {
+			return err
+		}
+		pdi := ie.NewPDI(pdicontent...)
+		if isPDIMatching(isGTP, pdi, teid, iface, pdu) {
+			isMatching = true
+			if isPDIAllWilcard(pdi) {
+				isWilcard = true
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return false, false, err
+	}
+	return isMatching, isWilcard, nil
+}
+func pfcpSessionLookUp(isGTP bool, teid uint32, iface string, pdu []byte) (session api.PFCPSessionInterface, err error) {
 	// On receipt of a user plane packet, the UP function shall perform a lookup of the provisioned PDRs and:
 	// - identify first the PFCP session to which the packet corresponds; and
 	// - find the first PDR matching the incoming packet, among all the PDRs provisioned for this PFCP session, starting
@@ -343,31 +410,42 @@ func findPDR(sessions []api.PFCPSessionInterface, isGTP bool, teid uint32, iface
 	// packets unmatched by any PDRs of any other PFCP session. The CP function may provision the UP function to
 	// send these packets to the CP function or to drop them. The UP function shall grant the lowest precedence to this
 	// PDR.
-
-	var sessionWilcard api.PFCPSessionInterface
-	var pdrWilcard *pfcprule.PDR
+	sessions := PFCPServer.GetPFCPSessions()
+	var wilcard api.PFCPSessionInterface
 	for _, session := range sessions {
-		// session.PDRS is already sorted
-		for _, pdr := range session.GetPDRs() {
-			pdicontent, err := pdr.PDI()
-			if err != nil {
-				return nil, nil, err
-			}
-			pdi := ie.NewPDI(pdicontent...)
-			if isPDIMatching(isGTP, pdi, teid, iface, pdu) {
-				if !isPDIAllWilcard(pdi) {
-					return session, pdr, nil
-				} else {
-					sessionWilcard, pdrWilcard = session, pdr
-				}
-
+		isMatching, isWilcard, err := checkPFCPSession(session, isGTP, teid, iface, pdu)
+		if err != nil {
+			return nil, err
+		}
+		if isMatching {
+			if isWilcard {
+				wilcard = session
+			} else {
+				return session, nil
 			}
 		}
 	}
-	if (sessionWilcard != nil) && (pdrWilcard != nil) {
-		return sessionWilcard, pdrWilcard, nil
+	if wilcard != nil {
+		return wilcard, nil
 	}
-	return nil, nil, fmt.Errorf("Could not find PDR for TEID %d", teid)
+	return nil, fmt.Errorf("Cannot find PFCP Session for this PDU")
+}
+func pfcpSessionPDRLookUp(session api.PFCPSessionInterface, isGTP bool, teid uint32, iface string, pdu []byte) (pdr api.PDRInterface, err error) {
+	for _, pdrid := range session.GetSortedPDRIDs() {
+		pdr, err := session.GetPDR(pdrid)
+		if err != nil {
+			return nil, err
+		}
+		pdicontent, err := pdr.PDI()
+		if err != nil {
+			return nil, err
+		}
+		pdi := ie.NewPDI(pdicontent...)
+		if isPDIMatching(isGTP, pdi, teid, iface, pdu) {
+			return pdr, nil
+		}
+	}
+	return nil, fmt.Errorf("Could not find PDR for TEID %d", teid)
 }
 
 func isPDIAllWilcard(pdi *ie.IE) bool {
@@ -378,16 +456,6 @@ func isPDIAllWilcard(pdi *ie.IE) bool {
 		return false
 	}
 	return true
-}
-
-func getPFCPSessionsGTP(msg message.Message) []api.PFCPSessionInterface {
-	//TODO: filter by PDN Type
-	return PFCPServer.GetPFCPSessions()
-}
-
-func getPFCPSessionsIP(packet []byte) []api.PFCPSessionInterface {
-	//TODO: filter by PDN Type
-	return PFCPServer.GetPFCPSessions()
 }
 
 func isPDIMatching(isGTP bool, pdi *ie.IE, teid uint32, iface string, packet []byte) (res bool) {

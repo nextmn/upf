@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	pfcp_networking "github.com/louisroyer/go-pfcp-networking/pfcp"
 	"github.com/songgao/water"
@@ -38,10 +39,28 @@ func Run() error {
 	if err != nil {
 		return err
 	}
+	err = createPFCPLogger()
+	if err != nil {
+		return err
+	}
 	for {
 		select {}
 	}
 	return nil
+}
+
+func createPFCPLogger() error {
+	go PFCPLogger()
+	return nil
+}
+
+func PFCPLogger() {
+	for {
+		select {
+		case <-time.After(10 * time.Second):
+			PFCPServer.PrintPFCPRules()
+		}
+	}
 }
 
 func createPFCPNode() error {
