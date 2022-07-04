@@ -1,3 +1,7 @@
+// Copyright 2022 Louis Royer and the NextMN-UPF contributors. All rights reserved.
+// Use of this source code is governed by a MIT-style license that can be
+// found in the LICENSE file.
+// SPDX-License-Identifier: MIT
 package main
 
 import (
@@ -23,8 +27,8 @@ func main() {
 	log.SetPrefix("[nextmn-upf] ")
 	var config string
 	app := &cli.App{
-		Name:                 "nextmn-upf",
-		Usage:                "An upf",
+		Name:                 "NextMN-UPF",
+		Usage:                "Experimental 5G UPF",
 		EnableBashCompletion: true,
 		Authors: []*cli.Author{
 			{Name: "Louis Royer"},

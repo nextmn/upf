@@ -178,7 +178,12 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 }
 
 func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface) (err error) {
-	//log.Println("Start handling of packet PDR:", pdr.ID)
+	//	pdrid, err := pdr.ID()
+	//	if err != nil {
+	//		log.Println("Bad PDRID")
+	//		return
+	//	}
+	//	log.Println("Start handling of packet PDR:", pdrid)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
 	ohr := pdr.OuterHeaderRemoval()
@@ -187,6 +192,9 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		packet, gtpHeaders, err = handleOuterHeaderRemoval(packet, isGTP, ohr)
 		if err != nil {
 			return err
+		}
+		if (packet[0]&0xF0 != 0x40) && (packet[0]&0xF0 != 0x60) {
+			log.Println("Warning: Non IP PDU detected")
 		}
 	}
 	if len(packet) == 0 {
@@ -283,22 +291,22 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 	} else {
 		// forward using TUN interface
 		// debug log start
-		var srcpdu net.IP
-		var dstpdu net.IP
-		if waterutil.IsIPv4(packet) {
-			p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
-			srcpdu = p.SrcIP
-			dstpdu = p.DstIP
-			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
-		} else if waterutil.IsIPv6(packet) {
-			p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
-			srcpdu = p.SrcIP
-			dstpdu = p.DstIP
-			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
-		} else {
-			log.Printf("Forwarding IP packet to TUN interface\n")
-			log.Println("Could not find PDR for IP packet on TUN interface")
-		}
+		//		var srcpdu net.IP
+		//		var dstpdu net.IP
+		//		if waterutil.IsIPv4(packet) {
+		//			p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+		//			srcpdu = p.SrcIP
+		//			dstpdu = p.DstIP
+		//			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
+		//		} else if waterutil.IsIPv6(packet) {
+		//			p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+		//			srcpdu = p.SrcIP
+		//			dstpdu = p.DstIP
+		//			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
+		//		} else {
+		//			log.Printf("Forwarding IP packet to TUN interface\n")
+		//			log.Println("Could not find PDR for IP packet on TUN interface")
+		//		}
 		// debug log end
 		TUNInterface.Write(packet)
 	}
@@ -361,7 +369,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 	if err != nil {
 		return err
 	}
-	log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
+	//log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
 	uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
 	return nil
 }
@@ -470,6 +478,8 @@ func isPDIMatching(isGTP bool, pdi *ie.IE, teid uint32, iface string, packet []b
 		} else if !((fteid.TEID == teid) && ((fteid.HasIPv4() && fteid.IPv4Address.Equal(net.ParseIP(iface))) || (fteid.HasIPv6() && fteid.IPv6Address.Equal(net.ParseIP(iface))))) {
 			return false
 		}
+	} else if isGTP {
+		return false
 	}
 	SDFFilter, _ := pdi.SDFFilter()
 	UEIPAddress, _ := pdi.UEIPAddress()
