@@ -12,6 +12,6 @@ require (
 	github.com/wmnsk/go-gtp v0.8.2-0.20220222134719-cf2a2c41232a
 	github.com/wmnsk/go-pfcp v0.0.16-0.20220415105220-d1e74d0d7288
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
