@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	upf "github.com/louisroyer/nextmn-upf/runtime"
+	upf "github.com/nextmn/upf/runtime"
 	"github.com/urfave/cli/v2"
 )
 

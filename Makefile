@@ -18,12 +18,12 @@ update:
 	go get -u github.com/louisroyer/go-pfcp-networking@master
 	go mod tidy
 install:
-	$(INSTALL) nextmn-upf $(DESTDIR)$(bindir)/nextmn-upf
-	$(INSTALL) bash-completion/completions/nextmn-upf $(DESTDIR)$(BASHCOMPLETIONSDIR)/nextmn-upf
+	$(INSTALL) upf $(DESTDIR)$(bindir)/upf
+	$(INSTALL) bash-completion/completions/upf $(DESTDIR)$(BASHCOMPLETIONSDIR)/upf
 	@echo "================================="
 	@echo ">> Now run the following command:"
-	@echo "\tsource $(DESTDIR)$(BASHCOMPLETIONSDIR)/nextmn-upf"
+	@echo "\tsource $(DESTDIR)$(BASHCOMPLETIONSDIR)/upf"
 	@echo "================================="
 uninstall:
-	$(RM) $(DESTDIR)$(bindir)/nextmn-upf
-	$(RM) $(DESTDIR)$(BASHCOMPLETIONSDIR)/nextmn-upf
+	$(RM) $(DESTDIR)$(bindir)/upf
+	$(RM) $(DESTDIR)$(BASHCOMPLETIONSDIR)/upf
