@@ -1,8 +1,8 @@
 pfcp-address: "10.0.60.3"
 tun-interface: upf
 gtpu-entities:
-  - "10.0.10.3" 
-  - "10.0.20.3" 
+  - "10.0.10.3"
+  - "10.0.20.3"
 #  - "fd00:d0cc:e700:1111:1::3"
 #  - "fd00:d0cc:e700:1111:2::3"
 dnn_list:
@@ -11,7 +11,7 @@ dnn_list:
 #  - dnn: "sliceA"
 #    cidr: "fd00:d0cc:e700:2222:1::/80"
 #pfcp-sessions:
-#  - pdrs: 
+#  - pdrs:
 #      - id: 1 # To C-DN
 #        precedence: 255
 #        pdi:

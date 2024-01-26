@@ -2,8 +2,7 @@ pfcp-address: "10.0.213.6"
 tun-interface: upf
 gtpu-entities:
   - "10.0.201.5"
-  - "10.0.215.4" 
+  - "10.0.215.4"
 dnn_list:
   - dnn: "sliceB"
     cidr: "10.0.111.0/24"
-

@@ -7,7 +7,7 @@ simulate-ran:
   ipv4: "10.0.200.2/24"
   ipv6: ""
 #  ipv6: "fd00:d0cc:e700:2222:1::2/80"
-#pfcp-sessions: 
+#pfcp-sessions:
 #  - pdrs:
 #      - id: 1
 #        precedence: 255
