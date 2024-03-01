@@ -1,7 +1,8 @@
 # NextMN-UPF
 NextMN-UPF is an experimental 5G UPF implementation. This UPF is implemented in User Space, meaning it does not depend on Linux GTP module.
-This UPF is still at the early stages of development and contains bugs and will crash in unexpected manners.
-Please do not use it for anything other than experimentation. Expect breaking changes until v1.0.0
+> [!WARNING]
+> This UPF is still at the early stages of development and contains bugs and will crash in unexpected manners.
+> Please do not use it for anything other than experimentation. Expect breaking changes until v1.0.0
 
 The following features are implemented:
 - IPv4/IPv6 both in inner and outer PDUs (note: IPv6 is not implemented in Linux GTP module)
