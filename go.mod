@@ -11,6 +11,6 @@ require (
 	github.com/wmnsk/go-gtp v0.8.9
 	github.com/wmnsk/go-pfcp v0.0.23
 	github.com/xrash/smetrics v0.0.0-20231213231151-1d8dd44e695e // indirect
-	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
