@@ -1756,8 +1756,9 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/wmnsk/go-gtp v0.8.10 h1:ym/tUV6VHGzm47fhA9N2qETrgM5cF3w+VLvdKsGtsMk=
 github.com/wmnsk/go-gtp v0.8.10/go.mod h1:9zxnN6ltreRh5yetDY3tGxrjKw9XTgy09d1PoE6NsiM=
-github.com/wmnsk/go-pfcp v0.0.23 h1:BhuKbFKHnoG/xWlGemAmh8kHG7iRxc6tuCo8E9qHkTI=
 github.com/wmnsk/go-pfcp v0.0.23/go.mod h1:Q9B171qmZEI4k5n6trskNCz8JqW0J+RjpuqDE6ssF7o=
+github.com/wmnsk/go-pfcp v0.0.24 h1:sv4F3U/IphsPUMXMkTJW877CRvXZ1sF5onWHGBvxx/A=
+github.com/wmnsk/go-pfcp v0.0.24/go.mod h1:8EUVvOzlz25wkUs9D8STNAs5zGyIo5xEUpHQOUZ/iSg=
 github.com/xhit/go-str2duration v1.2.0/go.mod h1:3cPSlfZlUHVlneIVfePFWcJZsuwf+P1v2SRTV4cUmp4=
 github.com/xhit/go-str2duration/v2 v2.1.0/go.mod h1:ohY8p+0f07DiV6Em5LKB0s2YpLtXVyJfNt1+BlmyAsU=
 github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673/go.mod h1:N3UwUGtsrSj3ccvlPHLoLsHnpR27oXr4ZE984MbSER8=
