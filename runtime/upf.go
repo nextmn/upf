@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	pfcp_networking "github.com/louisroyer/go-pfcp-networking/pfcp"
+	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 	"github.com/songgao/water"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"

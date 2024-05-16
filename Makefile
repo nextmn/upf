@@ -15,7 +15,7 @@ clean:
 	go clean
 reinstall: uninstall install
 update:
-	go get -u github.com/louisroyer/go-pfcp-networking@master
+	go get -u github.com/nextmn/go-pfcp-networking@master
 	go mod tidy
 install:
 	$(INSTALL) upf $(DESTDIR)$(bindir)/upf

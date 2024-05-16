@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/louisroyer/go-pfcp-networking/pfcp/api"
+	"github.com/nextmn/go-pfcp-networking/pfcp/api"
 	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
