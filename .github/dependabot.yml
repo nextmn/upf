@@ -5,7 +5,11 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    assignees:
+      - "louisroyer"
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
+    assignees:
+      - "louisroyer"
