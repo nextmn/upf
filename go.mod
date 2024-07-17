@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/nextmn/go-pfcp-networking v0.0.30
+	github.com/nextmn/go-pfcp-networking v0.0.32
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/wmnsk/go-gtp v0.8.10
