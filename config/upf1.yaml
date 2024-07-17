@@ -5,7 +5,7 @@ pfcp:
   maxRetrans: 3
 gtpu:
   forwarder: "wmnsk/go-gtp"
-  tunInterfaceName: gnb
+  tunInterfaceName: upf
   ifList:
     - addr: "10.0.10.3"
       type: N3
