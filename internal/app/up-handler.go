@@ -54,8 +54,8 @@ func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
 	return nil
 }
 
-func ipPacketHandler(packet []byte, db *FARAssociationDB, iface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
-	//log.Println("Received IP packet on TUN interface")
+func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
+	log.Println("Received IP packet on TUN interface")
 	pfcpSession, err := pfcpSessionLookUp(false, 0, "", packet, pfcpServer)
 	if err != nil {
 		return err
@@ -82,12 +82,12 @@ func ipPacketHandler(packet []byte, db *FARAssociationDB, iface *water.Interface
 		// end log debug
 		return err
 	}
-	handleIncommingPacket(db, packet, false, pfcpSession, pdr, iface)
+	handleIncommingPacket(db, packet, false, pfcpSession, pdr, tuniface)
 	return nil
 }
 
 func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
-	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
+	log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
 	packet := make([]byte, msg.MarshalLen())
 	err := msg.MarshalTo(packet)
 	if err != nil {
@@ -101,7 +101,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
 		return err
 	}
-	//log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
+	log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
 	handleIncommingPacket(db, packet, true, pfcpSession, pdr, tuniface)
 	return nil
 }
@@ -181,12 +181,12 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 }
 
 func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface, tuniface *water.Interface) (err error) {
-	//	pdrid, err := pdr.ID()
-	//	if err != nil {
-	//		log.Println("Bad PDRID")
-	//		return
-	//	}
-	//	log.Println("Start handling of packet PDR:", pdrid)
+	pdrid, err := pdr.ID()
+	if err != nil {
+		log.Println("Bad PDRID")
+		return
+	}
+	log.Println("Start handling of packet PDR:", pdrid)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
 	ohr := pdr.OuterHeaderRemoval()
