@@ -1,8 +1,8 @@
-// Copyright 2022 Louis Royer and the NextMN-UPF contributors. All rights reserved.
+// Copyright 2024 Louis Royer and the NextMN-UPF contributors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 // SPDX-License-Identifier: MIT
-package upf
+package app
 
 import (
 	"context"
@@ -14,7 +14,10 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 	"github.com/nextmn/go-pfcp-networking/pfcp/api"
+	"github.com/nextmn/upf/internal/constants"
+	"github.com/songgao/water"
 	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
@@ -51,9 +54,9 @@ func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
 	return nil
 }
 
-func ipPacketHandler(packet []byte, db *FARAssociationDB) error {
+func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
 	//log.Println("Received IP packet on TUN interface")
-	pfcpSession, err := pfcpSessionLookUp(false, 0, "", packet)
+	pfcpSession, err := pfcpSessionLookUp(false, 0, "", packet, pfcpServer)
 	if err != nil {
 		return err
 	}
@@ -79,11 +82,11 @@ func ipPacketHandler(packet []byte, db *FARAssociationDB) error {
 		// end log debug
 		return err
 	}
-	handleIncommingPacket(db, packet, false, pfcpSession, pdr)
+	handleIncommingPacket(db, packet, false, pfcpSession, pdr, tuniface)
 	return nil
 }
 
-func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB) error {
+func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
 	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
 	packet := make([]byte, msg.MarshalLen())
 	err := msg.MarshalTo(packet)
@@ -91,7 +94,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		log.Println("Could not marshal gtp packet")
 		return err
 	}
-	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface, packet)
+	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface, packet, pfcpServer)
 	defer pfcpSession.RUnlock()
 	pdr, err := pfcpSessionPDRLookUp(pfcpSession, true, msg.TEID(), iface, packet)
 	if err != nil {
@@ -99,7 +102,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		return err
 	}
 	//log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
-	handleIncommingPacket(db, packet, true, pfcpSession, pdr)
+	handleIncommingPacket(db, packet, true, pfcpSession, pdr, tuniface)
 	return nil
 }
 
@@ -177,13 +180,13 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface) (err error) {
-	//	pdrid, err := pdr.ID()
-	//	if err != nil {
-	//		log.Println("Bad PDRID")
-	//		return
-	//	}
-	//	log.Println("Start handling of packet PDR:", pdrid)
+func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface, tuniface *water.Interface) (err error) {
+	//pdrid, err := pdr.ID()
+	//if err != nil {
+	//	log.Println("Bad PDRID")
+	//	return
+	//}
+	//log.Println("Start handling of packet PDR:", pdrid)
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
 	ohr := pdr.OuterHeaderRemoval()
@@ -308,7 +311,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		//			log.Println("Could not find PDR for IP packet on TUN interface")
 		//		}
 		// debug log end
-		TUNInterface.Write(packet)
+		tuniface.Write(packet)
 	}
 	return nil
 
@@ -320,9 +323,9 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 	}
 	var udpaddr string
 	if strings.Count(ipAddress, ":") > 0 {
-		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, GTPU_PORT)
+		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, constants.GTPU_PORT)
 	} else {
-		udpaddr = fmt.Sprintf("%s:%s", ipAddress, GTPU_PORT)
+		udpaddr = fmt.Sprintf("%s:%s", ipAddress, constants.GTPU_PORT)
 	}
 	raddr, err := net.ResolveUDPAddr("udp", udpaddr)
 	if err != nil {
@@ -365,13 +368,11 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 		}(ch)
 		_ = <-ch
 	}
-	b, err := gpdu.Marshal()
-	if err != nil {
-		return err
+	if b, err := gpdu.Marshal(); err == nil {
+		//log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
+		uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
 	}
-	//log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
-	uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
-	return nil
+	return err
 }
 
 func checkPFCPSession(session api.PFCPSessionInterface, isGTP bool, teid uint32, iface string, pdu []byte) (bool, bool, error) {
@@ -404,7 +405,7 @@ func checkPFCPSession(session api.PFCPSessionInterface, isGTP bool, teid uint32,
 	}
 	return isMatching, isWilcard, nil
 }
-func pfcpSessionLookUp(isGTP bool, teid uint32, iface string, pdu []byte) (session api.PFCPSessionInterface, err error) {
+func pfcpSessionLookUp(isGTP bool, teid uint32, iface string, pdu []byte, pfcpServer *pfcp_networking.PFCPEntityUP) (session api.PFCPSessionInterface, err error) {
 	// On receipt of a user plane packet, the UP function shall perform a lookup of the provisioned PDRs and:
 	// - identify first the PFCP session to which the packet corresponds; and
 	// - find the first PDR matching the incoming packet, among all the PDRs provisioned for this PFCP session, starting
@@ -422,7 +423,7 @@ func pfcpSessionLookUp(isGTP bool, teid uint32, iface string, pdu []byte) (sessi
 	// packets unmatched by any PDRs of any other PFCP session. The CP function may provision the UP function to
 	// send these packets to the CP function or to drop them. The UP function shall grant the lowest precedence to this
 	// PDR.
-	sessions := PFCPServer.GetPFCPSessions()
+	sessions := pfcpServer.GetPFCPSessions()
 	var wilcard api.PFCPSessionInterface
 	for _, session := range sessions {
 		isMatching, isWilcard, err := checkPFCPSession(session, isGTP, teid, iface, pdu)
