@@ -372,7 +372,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 	if err != nil {
 		return err
 	}
-	//log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
+	log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
 	uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
 	return nil
 }
