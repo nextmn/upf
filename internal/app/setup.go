@@ -46,7 +46,7 @@ func (s *Setup) Init() error {
 	if s.config.Gtpu.Forwarder != "wmnsk/go-gtp" {
 		return fmt.Errorf("Only `wmnsk/go-gtp forwarder is supported`")
 	}
-	s.pfcpServer.Start()
+	go s.pfcpServer.ListenAndServe()
 	if err := s.createTun(); err != nil {
 		return err
 	}
@@ -67,13 +67,12 @@ func (s *Setup) Run() error {
 	if err := s.Init(); err != nil {
 		return err
 	}
-	for {
-		select {}
-	}
+	select {}
 }
 
 func (s *Setup) Exit() error {
 	s.logger.Exit()
 	s.removeTun()
+	s.pfcpServer.Close()
 	return nil
 }

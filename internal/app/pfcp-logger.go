@@ -28,7 +28,7 @@ func (l *PFCPLogger) Run() {
 		case <-l.stop:
 			return
 		case <-time.After(10 * time.Second):
-			l.srv.PrintPFCPRules()
+			l.srv.LogPFCPRules()
 		}
 	}
 }
