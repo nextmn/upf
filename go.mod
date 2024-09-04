@@ -4,7 +4,7 @@ go 1.22.1
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/nextmn/go-pfcp-networking v0.0.33-0.20240904150123-d09ddba289c3
+	github.com/nextmn/go-pfcp-networking v0.0.33
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/urfave/cli/v2 v2.27.4
 	github.com/wmnsk/go-gtp v0.8.10
@@ -18,10 +18,10 @@ require (
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/vishvananda/netlink v1.1.0 // indirect
+	github.com/vishvananda/netlink v1.3.0 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	golang.org/x/net v0.28.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
