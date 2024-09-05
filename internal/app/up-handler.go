@@ -243,7 +243,11 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		logrus.WithFields(logrus.Fields{"far-id": farid}).Error("Missing forward action for this FAR")
 	}
 
-	ohcfields, _ := far.ForwardingParameters().OuterHeaderCreation()
+	fp, err := far.ForwardingParameters()
+	if err != nil {
+		return fmt.Errorf("Apply action is has FORW, but there is no ForwardingParameters")
+	}
+	ohcfields, _ := fp.OuterHeaderCreation()
 
 	if ohcfields != nil {
 		// XXX: No method in go-pfcp to convert OuterHeaderCreationFields directly to ie.IE
@@ -266,7 +270,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			if err != nil {
 				return err
 			}
-			tlm, err := far.ForwardingParameters().TransportLevelMarking()
+			tlm, err := fp.TransportLevelMarking()
 			if err == nil {
 				return forwardGTP(gpdu, ipAddress, int(tlm>>8), session, farid, db)
 			} else {
