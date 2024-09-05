@@ -5,8 +5,8 @@
 package app
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 	"github.com/nextmn/upf/internal/config"
@@ -14,39 +14,42 @@ import (
 )
 
 type Setup struct {
-	config       *config.UpfConfig
-	pfcpServer   *pfcp_networking.PFCPEntityUP
-	farUconnDb   *FARAssociationDB
-	tunInterface *water.Interface
-	logger       *PFCPLogger
+	config            *config.UpfConfig
+	pfcpServer        *pfcp_networking.PFCPEntityUP
+	farUconnDb        *FARAssociationDB
+	tunInterface      *water.Interface
+	logger            *PFCPLogger
+	pfcpEntityOptions *pfcp_networking.EntityOptions
 }
 
-func NewSetup(config *config.UpfConfig) (*Setup, error) {
-	var t1 *time.Duration
-	if config.Pfcp.RetransTimeout != nil {
-		if t, err := time.ParseDuration(*config.Pfcp.RetransTimeout); err != nil {
-			return nil, fmt.Errorf("Could not parse RetransTimout: %v\n", err)
-		} else {
-			t1 = &t
-		}
-	}
-	opt, err := pfcp_networking.NewEntityOptions(t1, config.Pfcp.MaxRetrans)
-	if err != nil {
-		return nil, fmt.Errorf("Could not create EntityOptions: %v\n", err)
-	}
+func NewSetup(config *config.UpfConfig) *Setup {
+	opt := pfcp_networking.NewEntityOptions()
 	srv := pfcp_networking.NewPFCPEntityUPWithOptions(config.Pfcp.NodeID, config.Pfcp.Addr, opt)
 	return &Setup{
-		config:     config,
-		pfcpServer: srv,
-		farUconnDb: NewFARAssociationDB(),
-		logger:     NewPFCPLogger(srv),
-	}, nil
+		config:            config,
+		pfcpServer:        srv,
+		farUconnDb:        NewFARAssociationDB(),
+		logger:            NewPFCPLogger(srv),
+		pfcpEntityOptions: opt,
+	}
 }
-func (s *Setup) Init() error {
+func (s *Setup) Init(ctx context.Context) error {
 	if s.config.Gtpu.Forwarder != "wmnsk/go-gtp" {
 		return fmt.Errorf("Only `wmnsk/go-gtp forwarder is supported`")
 	}
-	go s.pfcpServer.ListenAndServe()
+	// setup pfcpEntityOptions
+	if s.config.Pfcp.RetransTimeout != nil {
+		if err := s.pfcpEntityOptions.SetMessageRetransmissionT1(*s.config.Pfcp.RetransTimeout); err != nil {
+			return err
+		}
+	}
+	if s.config.Pfcp.MaxRetrans != nil {
+		if err := s.pfcpEntityOptions.SetMessageRetransmissionN1(*s.config.Pfcp.MaxRetrans); err != nil {
+			return err
+		}
+	}
+
+	go s.pfcpServer.ListenAndServeContext(ctx)
 	if err := s.createTun(); err != nil {
 		return err
 	}
@@ -63,11 +66,15 @@ func (s *Setup) Init() error {
 	return nil
 }
 
-func (s *Setup) Run() error {
-	if err := s.Init(); err != nil {
+func (s *Setup) Run(ctx context.Context) error {
+	defer s.Exit()
+	if err := s.Init(ctx); err != nil {
 		return err
 	}
-	select {}
+	select {
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 func (s *Setup) Exit() error {

@@ -6,10 +6,10 @@ package app
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/nextmn/upf/internal/constants"
+	"github.com/sirupsen/logrus"
 	"github.com/songgao/water"
 )
 
@@ -39,7 +39,7 @@ func (s *Setup) createDLRoutes() error {
 	for _, ue := range s.config.DNNList {
 		err := runIP("route", "add", ue.Cidr, "dev", s.tunInterface.Name(), "proto", "static")
 		if err != nil {
-			log.Println("Cannot create Uplink route for", ue.Cidr)
+			logrus.WithError(err).WithFields(logrus.Fields{"prefix": ue.Cidr}).Error("Cannot create Uplink route for this prefix")
 			return err
 		}
 	}
@@ -52,7 +52,7 @@ func (s *Setup) removeTun() error {
 	}
 	err := runIP("link", "del", s.tunInterface.Name())
 	if nil != err {
-		log.Println("Unable to delete interface ", s.tunInterface.Name(), ":", err)
+		logrus.WithError(err).WithFields(logrus.Fields{"interface": s.tunInterface.Name()}).Error("Unable to delete interface")
 		return err
 	}
 	return nil
@@ -66,29 +66,34 @@ func (s *Setup) createTun() error {
 	}
 	iface, err := water.New(config)
 	if nil != err {
-		log.Println("Unable to allocate TUN interface:", err)
+		logrus.WithError(err).Error("Unable to allocate TUN interface")
 		return err
 	}
 	err = runIP("link", "set", "dev", iface.Name(), "mtu", strconv.Itoa(constants.MTU_GTP_TUN))
 	if nil != err {
-		log.Println("Unable to set MTU for", iface.Name())
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"mtu":       constants.MTU_GTP_TUN,
+			"interface": iface.Name(),
+		}).Error("Unable to set MTU")
 		return err
 	}
 	err = runIP("link", "set", "dev", iface.Name(), "up")
 	if nil != err {
-		log.Println("Unable to set", iface.Name(), "up")
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"interface": iface.Name(),
+		}).Error("Unable to set interface up")
 		return err
 	}
 	s.tunInterface = iface
 
 	err = runIPTables("-A", "OUTPUT", "-o", iface.Name(), "-p", "icmp", "--icmp-type", "redirect", "-j", "DROP")
 	if err != nil {
-		log.Println("Error while setting iptable rule to drop icmp redirects")
+		logrus.WithError(err).WithFields(logrus.Fields{"interface": iface.Name()}).Error("Error while setting iptable rule to drop icmp redirects")
 		return err
 	}
 	err = runIP6Tables("-A", "OUTPUT", "-o", iface.Name(), "-p", "icmpv6", "--icmpv6-type", "redirect", "-j", "DROP")
 	if err != nil {
-		log.Println("Error while setting iptable rule to drop icmpv6 redirects")
+		logrus.WithError(err).WithFields(logrus.Fields{"interface": iface.Name()}).Error("Error while setting iptable rule to drop icmpv6 redirects")
 		return err
 	}
 	return nil

@@ -7,7 +7,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -17,6 +16,7 @@ import (
 	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 	"github.com/nextmn/go-pfcp-networking/pfcp/api"
 	"github.com/nextmn/upf/internal/constants"
+	"github.com/sirupsen/logrus"
 	"github.com/songgao/water"
 	"github.com/songgao/water/waterutil"
 	"github.com/wmnsk/go-gtp/gtpv1"
@@ -55,7 +55,7 @@ func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
 }
 
 func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
-	//log.Println("Received IP packet on TUN interface")
+	logrus.Debug("Received IP packet on TUN interface")
 	pfcpSession, err := pfcpSessionLookUp(false, 0, "", packet, pfcpServer)
 	if err != nil {
 		return err
@@ -63,23 +63,23 @@ func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interf
 	defer pfcpSession.RUnlock()
 	pdr, err := pfcpSessionPDRLookUp(pfcpSession, false, 0, "", packet)
 	if err != nil {
-		// log debug
-		var srcpdu net.IP
-		var dstpdu net.IP
-		if waterutil.IsIPv4(packet) {
-			p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
-			srcpdu = p.SrcIP
-			dstpdu = p.DstIP
-			log.Printf("Could not find PDR for IP packet on TUN interface, src: %s, dst: %s\n", srcpdu.String(), dstpdu.String())
-		} else if waterutil.IsIPv6(packet) {
-			p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
-			srcpdu = p.SrcIP
-			dstpdu = p.DstIP
-			log.Printf("Could not find PDR for IP packet on TUN interface, src: %s, dst: %s\n", srcpdu.String(), dstpdu.String())
-		} else {
-			log.Println("Could not find PDR for IP packet on TUN interface")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			var srcpdu net.IP
+			var dstpdu net.IP
+			if waterutil.IsIPv4(packet) {
+				p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+				srcpdu = p.SrcIP
+				dstpdu = p.DstIP
+				logrus.WithFields(logrus.Fields{"src": srcpdu.String(), "dst": dstpdu.String()}).Trace("Could not find PDR for IP packet on TUN interface")
+			} else if waterutil.IsIPv6(packet) {
+				p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+				srcpdu = p.SrcIP
+				dstpdu = p.DstIP
+				logrus.WithFields(logrus.Fields{"src": srcpdu.String(), "dst": dstpdu.String()}).Trace("Could not find PDR for IP packet on TUN interface")
+			} else {
+				logrus.Trace("Could not find PDR for IP packet on TUN interface")
+			}
 		}
-		// end log debug
 		return err
 	}
 	handleIncommingPacket(db, packet, false, pfcpSession, pdr, tuniface)
@@ -87,21 +87,32 @@ func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interf
 }
 
 func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
-	//log.Println("GTP packet received from GTP-U Peer", senderAddr, "with TEID", msg.TEID(), "on interface", iface)
+	logrus.WithFields(logrus.Fields{
+		"sender":    senderAddr,
+		"teid":      msg.TEID(),
+		"interface": iface,
+	}).Debug("GTP packet received from GTP-U Peer")
 	packet := make([]byte, msg.MarshalLen())
 	err := msg.MarshalTo(packet)
 	if err != nil {
-		log.Println("Could not marshal gtp packet")
+		logrus.WithError(err).Error("Could not marshal GTP packet")
 		return err
 	}
 	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface, packet, pfcpServer)
 	defer pfcpSession.RUnlock()
 	pdr, err := pfcpSessionPDRLookUp(pfcpSession, true, msg.TEID(), iface, packet)
 	if err != nil {
-		log.Println("Could not find PDR for GTP packet with TEID", msg.TEID(), "on interface", iface)
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"teid":      msg.TEID(),
+			"interface": iface,
+		}).Error("Could not find PDR for this GTP packet")
 		return err
 	}
-	//log.Println("Found PDR", pdr.ID, "associated on packet with TEID", msg.TEID(), "on interface", iface)
+	logrus.WithFields(logrus.Fields{
+		"pdr-id":    pdr.ID,
+		"teid":      msg.TEID(),
+		"interface": iface,
+	}).Debug("Found PDR associated on this packet")
 	handleIncommingPacket(db, packet, true, pfcpSession, pdr, tuniface)
 	return nil
 }
@@ -180,15 +191,18 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface, tuniface *water.Interface) (err error) {
-	//pdrid, err := pdr.ID()
-	//if err != nil {
-	//	log.Println("Bad PDRID")
-	//	return
-	//}
-	//log.Println("Start handling of packet PDR:", pdrid)
+func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface, tuniface *water.Interface) error {
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		pdrid, err := pdr.ID()
+		if err == nil {
+			logrus.WithFields(logrus.Fields{"pdr-id": pdrid}).Trace("Start handling of packet")
+		} else {
+			logrus.Trace("Bad PDRID")
+		}
+	}
 	// Remove outer header if requested, and store GTP headers
 	var gtpHeaders []*message.ExtensionHeader
+	var err error
 	ohr := pdr.OuterHeaderRemoval()
 
 	if ohr != nil {
@@ -197,7 +211,7 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			return err
 		}
 		if (packet[0]&0xF0 != 0x40) && (packet[0]&0xF0 != 0x60) {
-			log.Println("Warning: Non IP PDU detected")
+			logrus.Warn("Non IP PDU detected")
 		}
 	}
 	if len(packet) == 0 {
@@ -212,7 +226,8 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 	}
 	far, err := session.GetFAR(farid)
 	if err != nil {
-		log.Println("Could not find FAR associated with PDR", pdr.ID)
+		logrus.WithFields(logrus.Fields{"pdr-id": pdr.ID}).WithError(err).Error("Could not find FAR associated with this PDR")
+		return err
 	}
 	applyAction := far.ApplyAction()
 	if applyAction != nil {
@@ -222,10 +237,10 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		case applyAction.HasFORW():
 			break // forwarding
 		default:
-			log.Println("Action", applyAction, "for FAR", farid, "is not implemented yet")
+			logrus.WithFields(logrus.Fields{"apply-action": applyAction, "far-id": farid}).Error("This Action is not implemented yet")
 		}
 	} else {
-		log.Println("Missing forward action for FAR", farid)
+		logrus.WithFields(logrus.Fields{"far-id": farid}).Error("Missing forward action for this FAR")
 	}
 
 	ohcfields, _ := far.ForwardingParameters().OuterHeaderCreation()
@@ -293,24 +308,29 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		}
 	} else {
 		// forward using TUN interface
-		// debug log start
-		//		var srcpdu net.IP
-		//		var dstpdu net.IP
-		//		if waterutil.IsIPv4(packet) {
-		//			p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
-		//			srcpdu = p.SrcIP
-		//			dstpdu = p.DstIP
-		//			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
-		//		} else if waterutil.IsIPv6(packet) {
-		//			p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
-		//			srcpdu = p.SrcIP
-		//			dstpdu = p.DstIP
-		//			log.Printf("Forwarding IP packet to TUN interface, src: %s, dst %s\n", srcpdu.String(), dstpdu.String())
-		//		} else {
-		//			log.Printf("Forwarding IP packet to TUN interface\n")
-		//			log.Println("Could not find PDR for IP packet on TUN interface")
-		//		}
-		// debug log end
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			var srcpdu net.IP
+			var dstpdu net.IP
+			if waterutil.IsIPv4(packet) {
+				p := gopacket.NewPacket(packet, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
+				srcpdu = p.SrcIP
+				dstpdu = p.DstIP
+				logrus.WithFields(logrus.Fields{
+					"src": srcpdu.String(),
+					"dst": dstpdu.String(),
+				}).Trace("Forwarding IP packet to TUN interface")
+			} else if waterutil.IsIPv6(packet) {
+				p := gopacket.NewPacket(packet, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
+				srcpdu = p.SrcIP
+				dstpdu = p.DstIP
+				logrus.WithFields(logrus.Fields{
+					"src": srcpdu.String(),
+					"dst": dstpdu.String(),
+				}).Trace("Forwarding IP packet to TUN interface")
+			} else {
+				logrus.Trace("Forwarding IP packet to TUN interface, but could not find PDR for this IP packet")
+			}
+		}
 		tuniface.Write(packet)
 	}
 	return nil
@@ -329,7 +349,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 	}
 	raddr, err := net.ResolveUDPAddr("udp", udpaddr)
 	if err != nil {
-		log.Println("Error while resolving UDP address of GTP-U Peer")
+		logrus.WithError(err).Error("Error while resolving UDP address of GTP-U Peer")
 		return err
 	}
 	// Check Uconn exists for this FAR
@@ -352,24 +372,24 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 		laddr := c.LocalAddr().(*net.UDPAddr)
 		ch := make(chan bool)
 		go func(ch chan bool) error {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(context.Background()) // FIXME: use context
 			defer cancel()
 			uConn, err = gtpv1.DialUPlane(ctx, laddr, raddr)
 			if err != nil {
-				log.Println("Dial failure")
+				logrus.WithError(err).Error("Dial failure")
 				return err
 			}
 			defer uConn.Close()
 			db.Add(seid, farid, uConn)
 			close(ch)
 			for {
-				select {}
+				select {} // FIXME: use context
 			}
 		}(ch)
 		_ = <-ch
 	}
 	if b, err := gpdu.Marshal(); err == nil {
-		//log.Printf("Forwarding gpdu to %s with TEID %d\n", raddr, gpdu.TEID)
+		logrus.WithFields(logrus.Fields{"remote-addr": raddr, "teid": gpdu.TEID}).Debug("Forwarding gpdu")
 		uConn.WriteToWithDSCPECN(b, raddr, dscpecn)
 	}
 	return err

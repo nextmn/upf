@@ -7,6 +7,7 @@ package config
 import (
 	"io/ioutil"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -26,16 +27,17 @@ func ParseConf(file string) (*UpfConfig, error) {
 }
 
 type UpfConfig struct {
-	Pfcp    PFCP  `yaml:"pfcp"`
-	Gtpu    GTPU  `yaml:"gtpu"`
-	DNNList []DNN `yaml:"dnnList"`
+	Pfcp    PFCP    `yaml:"pfcp"`
+	Gtpu    GTPU    `yaml:"gtpu"`
+	DNNList []DNN   `yaml:"dnnList"`
+	Logger  *Logger `yaml:"logger,omitempty"`
 }
 
 type PFCP struct {
-	Addr           string  `yaml:"addr"` // TODO: use netip.Addr instead
-	NodeID         string  `yaml:"nodeID"`
-	RetransTimeout *string `yaml:"retransTimeout,omitempty"`
-	MaxRetrans     *int    `yaml:"maxRetrans,omitempty"`
+	Addr           string         `yaml:"addr"` // TODO: use netip.Addr instead
+	NodeID         string         `yaml:"nodeID"`
+	RetransTimeout *time.Duration `yaml:"retransTimeout,omitempty"`
+	MaxRetrans     *int           `yaml:"maxRetrans,omitempty"`
 }
 
 type GTPU struct {
