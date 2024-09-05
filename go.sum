@@ -21,6 +21,8 @@ github.com/nextmn/go-pfcp-networking v0.0.34 h1:Xm6wT1wn/dn3jWsVxxdToz8yGrsV23uH
 github.com/nextmn/go-pfcp-networking v0.0.34/go.mod h1:KYoKLiltDmHL2YMU5mz2k/E1xMoz4TpmzTz6Nr5u5gA=
 github.com/nextmn/go-pfcp-networking v0.0.35 h1:wqfYaCdyUViviM/fF6Bf/GCnyvvQlLlFT5fk3AcpogM=
 github.com/nextmn/go-pfcp-networking v0.0.35/go.mod h1:KYoKLiltDmHL2YMU5mz2k/E1xMoz4TpmzTz6Nr5u5gA=
+github.com/nextmn/go-pfcp-networking v0.0.36-0.20240905114138-a56e3450651d h1:0McAHEifk/V294b0m3rj5XaU5eppIcbYkf3EisgAeBo=
+github.com/nextmn/go-pfcp-networking v0.0.36-0.20240905114138-a56e3450651d/go.mod h1:KYoKLiltDmHL2YMU5mz2k/E1xMoz4TpmzTz6Nr5u5gA=
 github.com/pascaldekloe/goe v0.1.1 h1:Ah6WQ56rZONR3RW3qWa2NCZ6JAVvSpUcoLBaOmYFt9Q=
 github.com/pascaldekloe/goe v0.1.1/go.mod h1:KSyfaxQOh0HZPjDP1FL/kFtbqYqrALJTaMafFUIccqU=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

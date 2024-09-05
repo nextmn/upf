@@ -4,7 +4,7 @@ go 1.22.1
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/nextmn/go-pfcp-networking v0.0.35
+	github.com/nextmn/go-pfcp-networking v0.0.36-0.20240905114138-a56e3450651d
 	github.com/sirupsen/logrus v1.9.3
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/urfave/cli/v2 v2.27.4
