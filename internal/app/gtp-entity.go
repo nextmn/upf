@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/nextmn/upf/internal/constants"
+	"github.com/sirupsen/logrus"
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"github.com/wmnsk/go-gtp/gtpv1/message"
 )
@@ -23,7 +24,7 @@ func (s *Setup) createGTPUProtocolEntities() error {
 }
 
 func (s *Setup) createGtpUProtocolEntity(ipAddress string) error {
-	fmt.Println("Creating new GTP-U Protocol Entity on", ipAddress)
+	logrus.WithFields(logrus.Fields{"listen-addr": ipAddress}).Info("Creating new GTP-U Protocol Entity")
 	var udpaddr string
 	if strings.Count(ipAddress, ":") > 0 {
 		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, constants.GTPU_PORT)
@@ -32,7 +33,7 @@ func (s *Setup) createGtpUProtocolEntity(ipAddress string) error {
 	}
 	laddr, err := net.ResolveUDPAddr("udp", udpaddr)
 	if err != nil {
-		fmt.Println("Error while resolving UDP address of local GTP entity")
+		logrus.WithError(err).Error("Error while resolving UDP address of local GTP entity")
 		return err
 	}
 	uConn := gtpv1.NewUPlaneConn(laddr)

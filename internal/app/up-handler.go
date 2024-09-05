@@ -648,7 +648,7 @@ func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool
 		if strings.Contains(src, "/") {
 			_, srcNet, err := net.ParseCIDR(src)
 			if err != nil {
-				fmt.Println(err)
+				logrus.WithFields(logrus.Fields{"cidr": src}).WithError(err).Debug("Could not parse cidr")
 				return false, err
 			}
 			if !srcNet.Contains(srcpdu) {
@@ -668,7 +668,7 @@ func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool
 		if strings.Contains(dst, "/") {
 			_, dstNet, err := net.ParseCIDR(dst)
 			if err != nil {
-				fmt.Println(err)
+				logrus.WithFields(logrus.Fields{"cidr": dst}).WithError(err).Debug("Could not parse cidr")
 				return false, err
 			}
 			if !dstNet.Contains(dstpdu) {

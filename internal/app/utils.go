@@ -5,10 +5,10 @@
 package app
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"os/exec"
+
+	"github.com/sirupsen/logrus"
 )
 
 func runIP(args ...string) error {
@@ -18,8 +18,10 @@ func runIP(args ...string) error {
 	cmd.Stdin = os.Stdin
 	err := cmd.Run()
 	if nil != err {
-		errLog := fmt.Sprintf("Error running %s: %s", cmd.Args[0], err)
-		log.Println(errLog)
+		logrus.WithFields(logrus.Fields{
+			"command":   cmd.Args[0],
+			"arguments": args,
+		}).WithError(err).Error("Error while running command")
 		return err
 	}
 	return nil
@@ -32,8 +34,10 @@ func runIPTables(args ...string) error {
 	cmd.Stdin = os.Stdin
 	err := cmd.Run()
 	if nil != err {
-		errLog := fmt.Sprintf("Error running %s: %s", cmd.Args[0], err)
-		log.Println(errLog)
+		logrus.WithFields(logrus.Fields{
+			"command":   cmd.Args[0],
+			"arguments": args,
+		}).WithError(err).Error("Error while running command")
 		return err
 	}
 	return nil
@@ -46,8 +50,10 @@ func runIP6Tables(args ...string) error {
 	cmd.Stdin = os.Stdin
 	err := cmd.Run()
 	if nil != err {
-		errLog := fmt.Sprintf("Error running %s: %s", cmd.Args[0], err)
-		log.Println(errLog)
+		logrus.WithFields(logrus.Fields{
+			"command":   cmd.Args[0],
+			"arguments": args,
+		}).WithError(err).Error("Error while running command")
 		return err
 	}
 	return nil
