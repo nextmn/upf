@@ -9,6 +9,9 @@ import (
 	"strconv"
 
 	"github.com/nextmn/upf/internal/constants"
+
+	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
+
 	"github.com/sirupsen/logrus"
 	"github.com/songgao/water"
 )
@@ -25,7 +28,12 @@ func (s *Setup) createTUNInterface() error {
 			if err != nil {
 				return err
 			}
-			go ipPacketHandler(packet[:n], s.farUconnDb, s.tunInterface, s.pfcpServer)
+			go func(packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) {
+				err := ipPacketHandler(packet, db, tuniface, pfcpServer)
+				if err != nil {
+					logrus.WithError(err).Debug("Drop packet")
+				}
+			}(packet[:n], s.farUconnDb, s.tunInterface, s.pfcpServer)
 		}
 		return nil
 	}()
