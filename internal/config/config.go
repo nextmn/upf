@@ -15,6 +15,9 @@ import (
 func ParseConf(file string) (*UpfConfig, error) {
 	var conf UpfConfig
 	path, err := filepath.Abs(file)
+	if err != nil {
+		return nil, err
+	}
 	yamlFile, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err

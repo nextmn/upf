@@ -99,6 +99,13 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		return err
 	}
 	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface, packet, pfcpServer)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"teid":      msg.TEID(),
+			"interface": iface,
+		}).Error("Could not find Session for this GTP packet")
+		return err
+	}
 	defer pfcpSession.RUnlock()
 	pdr, err := pfcpSessionPDRLookUp(pfcpSession, true, msg.TEID(), iface, packet)
 	if err != nil {
