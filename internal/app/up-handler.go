@@ -582,111 +582,209 @@ func checkUEIPAddress(ueipaddress *ie.UEIPAddressFields, sourceInterface uint8, 
 	return false, nil
 }
 
-func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool, err error) {
-	if sourceInterface != ie.SrcInterfaceAccess {
-		return false, fmt.Errorf("IP Filter Rule is only implemented for when source interface is ACCESS")
+// Flow-Description AVP is specified in 3GPP TS 29.214, section 5.3.8
+// > The direction "in" refers to uplink IP flows, and the direction "out" refers to downlink IP
+// This means:
+// 1.
+//
+//	permit in ip from <UE> to <Target>
+//
+// is an uplink rule equivalent to
+//
+//	permit out ip from <Target> to <UE>
+//
+// 2.
+//
+//	permit out ip from <Target> to <UE>
+//
+// is an downlink rule equivalent to
+//
+//	permit in ip from <UE> to <Target>
+type FlowDescriptionAVP struct {
+	Proto     string
+	From      string
+	To        string
+	Action    string
+	Direction string
+	DstPort   string
+	SrcPort   string
+}
+
+func (f FlowDescriptionAVP) Target(IfaceSrc uint8) string {
+	switch f.Direction {
+	case "out": // Downlink
+		switch IfaceSrc {
+		case ie.SrcInterfaceCore: // Downlink
+			// nominal case
+			return f.From
+		case ie.SrcInterfaceAccess: // Uplink
+			// reversed case
+			return f.To
+		}
+	case "in": // Uplink
+		switch IfaceSrc {
+		case ie.SrcInterfaceAccess: // Uplink
+			// nominal case
+			return f.To
+		case ie.SrcInterfaceCore: // Downlink
+			// reversed case
+			return f.From
+		}
 	}
-	// IP Filter rule is specified in clause 5.4.2 of 3GPP TS 29.212
+	return ""
+}
+
+func (f FlowDescriptionAVP) UE(IfaceSrc uint8) string {
+	switch f.Direction {
+	case "out": // Downlink
+		switch IfaceSrc {
+		case ie.SrcInterfaceCore: // Downlink
+			// nominal case
+			return f.To
+		case ie.SrcInterfaceAccess: // Uplink
+			// reversed case
+			return f.From
+		}
+	case "in": // Uplink
+		switch IfaceSrc {
+		case ie.SrcInterfaceAccess: // Uplink
+			// nominal case
+			return f.From
+		case ie.SrcInterfaceCore: // Downlink
+			// reversed case
+			return f.To
+		}
+	}
+	return ""
+}
+
+type PDUAddr struct {
+	Src net.IP
+	Dst net.IP
+}
+
+func (pdu PDUAddr) Target(IfaceSrc uint8) net.IP {
+	switch IfaceSrc {
+	case ie.SrcInterfaceAccess: // Uplink
+		return pdu.Dst
+	case ie.SrcInterfaceCore: //Downlink
+		return pdu.Src
+	}
+	return net.IP{}
+}
+func (pdu PDUAddr) UE(IfaceSrc uint8) net.IP {
+	switch IfaceSrc {
+	case ie.SrcInterfaceAccess: // Uplink
+		return pdu.Src
+	case ie.SrcInterfaceCore: //Downlink
+		return pdu.Dst
+	}
+	return net.IP{}
+}
+
+func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool, err error) {
 	r := strings.Split(rule, " ")
 	if r[3] != "from" || (r[5] != "to" && r[6] != "to") {
 		return false, fmt.Errorf("Malformed IP Filter Rule")
 	}
-	action := r[0]
-	dir := r[1]
-	proto := r[2]
-	src := r[4]
-	var dst string
-	srcPorts := ""
-	dstPorts := ""
+	filter := FlowDescriptionAVP{
+		Action:    r[0],
+		Direction: r[1],
+		Proto:     r[2],
+		From:      r[4],
+	}
+
+	// For PFCP, IP Filter rule is more limited and specified 3GPP TS 29.212, section 5.4.2
+	// In particular:
+	// > Action shall be the keyword "permit"
+	// > Direction shall be keyword "out"
+	// > No "options" shall be used
+	if filter.Action != "permit" {
+		return false, fmt.Errorf("IP Filter Rule action shall be keyword 'permit'")
+	}
+	if filter.Direction != "out" {
+		return false, fmt.Errorf("IP Filter Rule direction shall be keyword 'out'")
+	}
+	if filter.Proto != "ip" {
+		return false, fmt.Errorf("IP Filter Rule protocol is only implemented with value 'ip'")
+	}
 	optionsList := map[string]struct{}{"frag": {}, "ipoptions": {}, "tcpoptions": {}, "established": {}, "setup": {}, "tcpflags": {}, "icmptypes": {}}
 	if r[5] != "to" {
-		srcPorts = r[5]
-		dst = r[7]
+		filter.SrcPort = r[5]
+		filter.To = r[7]
 		if len(r) > 8 {
 			if _, ok := optionsList[r[8]]; ok {
 				return false, fmt.Errorf("IP Filter Rule shall not use options")
 			} else {
-				dstPorts = r[8]
+				filter.SrcPort = r[8]
 			}
 		}
 
 	} else {
-		dst = r[6]
+		filter.To = r[6]
 		if len(r) > 7 {
 			if _, ok := optionsList[r[7]]; ok {
 				return false, fmt.Errorf("IP Filter Rule shall not use options")
 			} else {
-				dstPorts = r[7]
+				filter.DstPort = r[7]
 			}
 		}
 	}
-	if action != "permit" {
-		return false, fmt.Errorf("IP Filter Rule action shall be keyword 'permit'")
-	}
-	if dir != "out" {
-		return false, fmt.Errorf("IP Filter Rule direction shall be keyword 'out'")
-	}
-	if proto != "ip" {
-		return false, fmt.Errorf("IP Filter Rule protocol is only implemented with value 'ip'")
-	}
-	if strings.HasPrefix(src, "!") || strings.HasPrefix(dst, "!") {
+
+	// The following is not implemented (but it should be)
+	if strings.HasPrefix(filter.From, "!") || strings.HasPrefix(filter.To, "!") {
 		return false, fmt.Errorf("IP Filter Rule shall not use the invert modifier '!'")
 	}
-	if srcPorts != "" {
+	if filter.SrcPort != "" {
 		return false, fmt.Errorf("IP Filter Rule with ports in source is not implemented")
 	}
-	if dstPorts != "" {
+	if filter.DstPort != "" {
 		return false, fmt.Errorf("IP Filter Rule with ports in destination is not implemented")
 	}
-	var srcpdu net.IP
-	var dstpdu net.IP
+
+	if (sourceInterface != ie.SrcInterfaceAccess) && (sourceInterface != ie.SrcInterfaceCore) {
+		return false, fmt.Errorf("IP Filter Rule is only implemented for when source interface is \"Access\" or \"Core\"")
+	}
+
+	//
+	pduAddr := PDUAddr{}
 	if waterutil.IsIPv4(pdu) {
 		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv4, gopacket.Default).NetworkLayer().(*layers.IPv4)
-		srcpdu = p.SrcIP
-		dstpdu = p.DstIP
+		pduAddr.Src = p.SrcIP
+		pduAddr.Dst = p.DstIP
 	} else if waterutil.IsIPv6(pdu) {
 		p := gopacket.NewPacket(pdu, layers.LayerTypeIPv6, gopacket.Default).NetworkLayer().(*layers.IPv6)
-		srcpdu = p.SrcIP
-		dstpdu = p.DstIP
+		pduAddr.Src = p.SrcIP
+		pduAddr.Dst = p.DstIP
 	} else {
 		return false, fmt.Errorf("PDU is not IPv4 or IPv6")
 	}
-	if src != "any" {
-		if strings.Contains(src, "/") {
-			_, srcNet, err := net.ParseCIDR(src)
-			if err != nil {
-				logrus.WithFields(logrus.Fields{"cidr": src}).WithError(err).Debug("Could not parse cidr")
-				return false, err
-			}
-			if !srcNet.Contains(srcpdu) {
-				return false, nil
-			}
-		} else {
-			srcIp := net.ParseIP(src)
-			if srcIp == nil {
-				return false, fmt.Errorf("Invalid IP address in SDF Flow Description for source")
-			}
-			if !(srcIp.Equal(srcpdu)) {
-				return false, nil
-			}
-		}
+	if b, err := CompareIP(filter.Target(sourceInterface), pduAddr.Target(sourceInterface)); !b {
+		return b, err
 	}
-	if dst != "any" {
-		if strings.Contains(dst, "/") {
-			_, dstNet, err := net.ParseCIDR(dst)
+	if b, err := CompareIP(filter.UE(sourceInterface), pduAddr.UE(sourceInterface)); !b {
+		return b, err
+	}
+	return true, nil
+}
+
+func CompareIP(filterIp string, pduIp net.IP) (bool, error) {
+	if filterIp != "any" {
+		if strings.Contains(filterIp, "/") {
+			_, net, err := net.ParseCIDR(filterIp)
 			if err != nil {
-				logrus.WithFields(logrus.Fields{"cidr": dst}).WithError(err).Debug("Could not parse cidr")
+				logrus.WithFields(logrus.Fields{"cidr": filterIp}).WithError(err).Debug("Could not parse cidr")
 				return false, err
 			}
-			if !dstNet.Contains(dstpdu) {
+			if !net.Contains(pduIp) {
 				return false, nil
 			}
 		} else {
-			dstIp := net.ParseIP(dst)
-			if dstIp == nil {
-				return false, fmt.Errorf("Invalid IP address in SDF Flow Description for destination")
+			fIp := net.ParseIP(filterIp)
+			if fIp == nil {
+				return false, fmt.Errorf("Invalid IP address in SDF Flow Description")
 			}
-			if !dstIp.Equal(dstpdu) {
+			if !fIp.Equal(pduIp) {
 				return false, nil
 			}
 		}
