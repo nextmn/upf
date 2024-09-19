@@ -592,79 +592,43 @@ func checkUEIPAddress(ueipaddress *ie.UEIPAddressFields, sourceInterface uint8, 
 	return false, nil
 }
 
-// Flow-Description AVP is specified in 3GPP TS 29.214, section 5.3.8
-// > The direction "in" refers to uplink IP flows, and the direction "out" refers to downlink IP
-// This means:
-// 1.
-//
-//	permit in ip from <UE> to <Target>
-//
-// is an uplink rule equivalent to
-//
-//	permit out ip from <Target> to <UE>
-//
-// 2.
-//
-//	permit out ip from <Target> to <UE>
-//
-// is an downlink rule equivalent to
-//
-//	permit in ip from <UE> to <Target>
-type FlowDescriptionAVP struct {
+// Flow Description AVP is originally specificed by 3GPP TS 29.214, section 5.3.8
+// For PFCP, it is more limited and specified by 3GPP TS 29.212, section 5.4.2
+type FlowDescriptionAVPPFCP struct {
 	Proto     string
-	From      string
-	To        string
-	Action    string
-	Direction string
+	from      string
+	to        string
+	Action    string // must always be "permit"
+	Direction string // must always be "out" regardless of whether the PDR is for matching uplink or downlink traffic
+	IfaceSrc  uint8
 	DstPort   string
 	SrcPort   string
 }
 
-func (f FlowDescriptionAVP) Target(IfaceSrc uint8) string {
-	// in nominal case, Target is the destination
-	switch f.Direction {
-	case "out": // Downlink
-		switch IfaceSrc {
-		case ie.SrcInterfaceCore: // Downlink
-			// nominal case
-			return f.To
-		case ie.SrcInterfaceAccess: // Uplink
-			// reversed case
-			return f.From
-		}
-	case "in": // Uplink
-		switch IfaceSrc {
-		case ie.SrcInterfaceAccess: // Uplink
-			// nominal case
-			return f.From
-		case ie.SrcInterfaceCore: // Downlink
-			// reversed case
-			return f.To
-		}
+func (f FlowDescriptionAVPPFCP) To(IfaceSrc uint8) string {
+	switch f.IfaceSrc {
+	case ie.SrcInterfaceCore: // Downlink
+		// when the Source interface is CORE, this indicates that the filter
+		// is for downlink data flow, so the UP function shall apply the Flow Description as is;
+		return f.to
+	case ie.SrcInterfaceAccess: // Uplink
+		// when the Source interface is ACCESS, this indicates that the filter
+		// is for uplink data flow, so the UP fuction shall swap the source and destination address
+		return f.from
 	}
 	return ""
 }
 
-func (f FlowDescriptionAVP) UE(IfaceSrc uint8) string {
-	switch f.Direction {
-	case "out": // Downlink
-		switch IfaceSrc {
-		case ie.SrcInterfaceCore: // Downlink
-			// nominal case
-			return f.From
-		case ie.SrcInterfaceAccess: // Uplink
-			// reversed case
-			return f.To
-		}
-	case "in": // Uplink
-		switch IfaceSrc {
-		case ie.SrcInterfaceAccess: // Uplink
-			// nominal case
-			return f.To
-		case ie.SrcInterfaceCore: // Downlink
-			// reversed case
-			return f.From
-		}
+func (f FlowDescriptionAVPPFCP) From(IfaceSrc uint8) string {
+	switch f.IfaceSrc {
+	case ie.SrcInterfaceCore: // Downlink
+		// when the Source interface is CORE, this indicates that the filter
+		// is for downlink data flow, so the UP function shall apply the Flow Description as is;
+		return f.from
+	case ie.SrcInterfaceAccess: // Uplink
+		// when the Source interface is ACCESS, this indicates that the filter
+		// is for uplink data flow, so the UP fuction shall swap the source and destination address
+		return f.to
 	}
 	return ""
 }
@@ -674,35 +638,16 @@ type PDUAddr struct {
 	Dst net.IP
 }
 
-func (pdu PDUAddr) Target(IfaceSrc uint8) net.IP {
-	switch IfaceSrc {
-	case ie.SrcInterfaceAccess: // Uplink
-		return pdu.Dst
-	case ie.SrcInterfaceCore: //Downlink
-		return pdu.Src
-	}
-	return net.IP{}
-}
-func (pdu PDUAddr) UE(IfaceSrc uint8) net.IP {
-	switch IfaceSrc {
-	case ie.SrcInterfaceAccess: // Uplink
-		return pdu.Src
-	case ie.SrcInterfaceCore: //Downlink
-		return pdu.Dst
-	}
-	return net.IP{}
-}
-
 func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool, err error) {
 	r := strings.Split(rule, " ")
 	if r[3] != "from" || (r[5] != "to" && r[6] != "to") {
 		return false, fmt.Errorf("Malformed IP Filter Rule")
 	}
-	filter := FlowDescriptionAVP{
+	filter := FlowDescriptionAVPPFCP{
 		Action:    r[0],
 		Direction: r[1],
 		Proto:     r[2],
-		From:      r[4],
+		from:      r[4],
 	}
 
 	// For PFCP, IP Filter rule is more limited and specified 3GPP TS 29.212, section 5.4.2
@@ -722,7 +667,7 @@ func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool
 	optionsList := map[string]struct{}{"frag": {}, "ipoptions": {}, "tcpoptions": {}, "established": {}, "setup": {}, "tcpflags": {}, "icmptypes": {}}
 	if r[5] != "to" {
 		filter.SrcPort = r[5]
-		filter.To = r[7]
+		filter.to = r[7]
 		if len(r) > 8 {
 			if _, ok := optionsList[r[8]]; ok {
 				return false, fmt.Errorf("IP Filter Rule shall not use options")
@@ -732,7 +677,7 @@ func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool
 		}
 
 	} else {
-		filter.To = r[6]
+		filter.to = r[6]
 		if len(r) > 7 {
 			if _, ok := optionsList[r[7]]; ok {
 				return false, fmt.Errorf("IP Filter Rule shall not use options")
@@ -743,7 +688,7 @@ func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool
 	}
 
 	// The following is not implemented (but it should be)
-	if strings.HasPrefix(filter.From, "!") || strings.HasPrefix(filter.To, "!") {
+	if strings.HasPrefix(filter.from, "!") || strings.HasPrefix(filter.to, "!") {
 		return false, fmt.Errorf("IP Filter Rule shall not use the invert modifier '!'")
 	}
 	if filter.SrcPort != "" {
@@ -770,10 +715,10 @@ func checkIPFilterRule(rule string, sourceInterface uint8, pdu []byte) (res bool
 	} else {
 		return false, fmt.Errorf("PDU is not IPv4 or IPv6")
 	}
-	if b, err := CompareIP(filter.Target(sourceInterface), pduAddr.Target(sourceInterface)); !b {
+	if b, err := CompareIP(filter.From(sourceInterface), pduAddr.Src); !b {
 		return b, err
 	}
-	if b, err := CompareIP(filter.UE(sourceInterface), pduAddr.UE(sourceInterface)); !b {
+	if b, err := CompareIP(filter.To(sourceInterface), pduAddr.Dst); !b {
 		return b, err
 	}
 	return true, nil
