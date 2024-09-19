@@ -486,6 +486,7 @@ func pfcpSessionPDRLookUp(session api.PFCPSessionInterface, isGTP bool, teid uin
 		}
 		pdi := ie.NewPDI(pdicontent...)
 		if isPDIMatching(isGTP, pdi, teid, iface, pdu) {
+			logrus.WithFields(logrus.Fields{"pdrid": pdrid}).Debug("matching PDI")
 			return pdr, nil
 		}
 	}
@@ -527,7 +528,11 @@ func isPDIMatching(isGTP bool, pdi *ie.IE, teid uint32, iface string, packet []b
 		}
 		var err error
 
-		SourceInterface, _ := pdi.SourceInterface()
+		SourceInterface, err := pdi.SourceInterface()
+		if err != nil {
+			logrus.WithError(err).Debug("No source interface")
+			return false
+		}
 		if UEIPAddress != nil {
 			res, err = checkUEIPAddress(UEIPAddress, SourceInterface, packet)
 			if (err != nil) || !res {
@@ -537,6 +542,11 @@ func isPDIMatching(isGTP bool, pdi *ie.IE, teid uint32, iface string, packet []b
 		if SDFFilter != nil {
 			res, err = checkIPFilterRule(SDFFilter.FlowDescription, SourceInterface, packet)
 			if (err != nil) || !res {
+				if err != nil {
+					logrus.WithError(err).Debug("Error while checking SDF Filter")
+				} else {
+					logrus.WithFields(logrus.Fields{"result": res}).Debug("Not matching SDF Filter")
+				}
 				return false
 			}
 		}
@@ -611,24 +621,25 @@ type FlowDescriptionAVP struct {
 }
 
 func (f FlowDescriptionAVP) Target(IfaceSrc uint8) string {
+	// in nominal case, Target is the destination
 	switch f.Direction {
 	case "out": // Downlink
 		switch IfaceSrc {
 		case ie.SrcInterfaceCore: // Downlink
 			// nominal case
-			return f.From
+			return f.To
 		case ie.SrcInterfaceAccess: // Uplink
 			// reversed case
-			return f.To
+			return f.From
 		}
 	case "in": // Uplink
 		switch IfaceSrc {
 		case ie.SrcInterfaceAccess: // Uplink
 			// nominal case
-			return f.To
+			return f.From
 		case ie.SrcInterfaceCore: // Downlink
 			// reversed case
-			return f.From
+			return f.To
 		}
 	}
 	return ""
@@ -640,19 +651,19 @@ func (f FlowDescriptionAVP) UE(IfaceSrc uint8) string {
 		switch IfaceSrc {
 		case ie.SrcInterfaceCore: // Downlink
 			// nominal case
-			return f.To
+			return f.From
 		case ie.SrcInterfaceAccess: // Uplink
 			// reversed case
-			return f.From
+			return f.To
 		}
 	case "in": // Uplink
 		switch IfaceSrc {
 		case ie.SrcInterfaceAccess: // Uplink
 			// nominal case
-			return f.From
+			return f.To
 		case ie.SrcInterfaceCore: // Downlink
 			// reversed case
-			return f.To
+			return f.From
 		}
 	}
 	return ""
@@ -777,6 +788,7 @@ func CompareIP(filterIp string, pduIp net.IP) (bool, error) {
 				return false, err
 			}
 			if !net.Contains(pduIp) {
+				logrus.WithFields(logrus.Fields{"filter-ip": filterIp, "pdu-ip": pduIp}).Debug("no match")
 				return false, nil
 			}
 		} else {
@@ -785,9 +797,11 @@ func CompareIP(filterIp string, pduIp net.IP) (bool, error) {
 				return false, fmt.Errorf("Invalid IP address in SDF Flow Description")
 			}
 			if !fIp.Equal(pduIp) {
+				logrus.WithFields(logrus.Fields{"filter-ip": filterIp, "pdu-ip": pduIp}).Debug("no match")
 				return false, nil
 			}
 		}
 	}
+	logrus.WithFields(logrus.Fields{"filter-ip": filterIp, "pdu-ip": pduIp}).Debug("match")
 	return true, nil
 }
