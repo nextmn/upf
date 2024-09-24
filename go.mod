@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	github.com/adrg/xdg v0.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
