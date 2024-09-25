@@ -47,6 +47,8 @@ github.com/nextmn/go-pfcp-networking v0.0.36-0.20240905144631-b6135a55d9ee h1:JE
 github.com/nextmn/go-pfcp-networking v0.0.36-0.20240905144631-b6135a55d9ee/go.mod h1:KYoKLiltDmHL2YMU5mz2k/E1xMoz4TpmzTz6Nr5u5gA=
 github.com/nextmn/go-pfcp-networking v0.0.36 h1:eZjC+d61unz13E/qpggcas5xbudheSkN2Pr6nZiZr1E=
 github.com/nextmn/go-pfcp-networking v0.0.36/go.mod h1:KYoKLiltDmHL2YMU5mz2k/E1xMoz4TpmzTz6Nr5u5gA=
+github.com/nextmn/logrus-formatter v0.0.1 h1:Bsf78jjiEESc+rV8xE6IyKj4frDPGMwXFNrLQzm6A1E=
+github.com/nextmn/logrus-formatter v0.0.1/go.mod h1:vdSZ+sIcSna8vjbXkSFxsnsKHqRwaUEed4JCPcXoGyM=
 github.com/pascaldekloe/goe v0.1.1 h1:Ah6WQ56rZONR3RW3qWa2NCZ6JAVvSpUcoLBaOmYFt9Q=
 github.com/pascaldekloe/goe v0.1.1/go.mod h1:KSyfaxQOh0HZPjDP1FL/kFtbqYqrALJTaMafFUIccqU=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

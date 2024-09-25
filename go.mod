@@ -1,8 +1,9 @@
 module github.com/nextmn/upf
 
-go 1.22.1
+go 1.22.7
 
 require (
+	github.com/adrg/xdg v0.5.0
 	github.com/google/gopacket v1.1.19
 	github.com/nextmn/go-pfcp-networking v0.0.36
 	github.com/sirupsen/logrus v1.9.3
@@ -14,9 +15,9 @@ require (
 )
 
 require (
-	github.com/adrg/xdg v0.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
+	github.com/nextmn/logrus-formatter v0.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/vishvananda/netlink v1.3.0 // indirect
