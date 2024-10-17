@@ -3,7 +3,7 @@ module github.com/nextmn/upf
 go 1.22.7
 
 require (
-	github.com/adrg/xdg v0.5.0
+	github.com/adrg/xdg v0.5.1
 	github.com/google/gopacket v1.1.19
 	github.com/nextmn/go-pfcp-networking v0.0.37
 	github.com/nextmn/logrus-formatter v0.0.1
