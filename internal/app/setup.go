@@ -1,7 +1,8 @@
-// Copyright 2024 Louis Royer and the NextMN-UPF contributors. All rights reserved.
+// Copyright 2024 Louis Royer and the NextMN contributors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 // SPDX-License-Identifier: MIT
+
 package app
 
 import (
@@ -24,7 +25,7 @@ type Setup struct {
 
 func NewSetup(config *config.UpfConfig) *Setup {
 	opt := pfcp_networking.NewEntityOptions()
-	srv := pfcp_networking.NewPFCPEntityUPWithOptions(config.Pfcp.NodeID, config.Pfcp.Addr, opt)
+	srv := pfcp_networking.NewPFCPEntityUPWithOptions(config.Pfcp.NodeID, config.Pfcp.Addr.String(), opt)
 	return &Setup{
 		config:            config,
 		pfcpServer:        srv,

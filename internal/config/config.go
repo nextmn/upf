@@ -1,11 +1,13 @@
-// Copyright 2022 Louis Royer and the NextMN-UPF contributors. All rights reserved.
+// Copyright 2022 Louis Royer and the NextMN contributors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 // SPDX-License-Identifier: MIT
+
 package config
 
 import (
 	"io/ioutil"
+	"net/netip"
 	"path/filepath"
 	"time"
 
@@ -37,7 +39,7 @@ type UpfConfig struct {
 }
 
 type PFCP struct {
-	Addr           string         `yaml:"addr"` // TODO: use netip.Addr instead
+	Addr           netip.Addr     `yaml:"addr"`
 	NodeID         string         `yaml:"nodeID"`
 	RetransTimeout *time.Duration `yaml:"retransTimeout,omitempty"`
 	MaxRetrans     *int           `yaml:"maxRetrans,omitempty"`
@@ -49,11 +51,11 @@ type GTPU struct {
 	GTPUProtocolEntities []GTPUProtocolEntity `yaml:"ifList"`
 }
 type GTPUProtocolEntity struct {
-	Addr string `yaml:"addr"` // TODO: use netip.Addr instead
-	Type string `yaml:"type"` // unused for now, should contain N3, N9, etc.
+	Addr netip.Addr `yaml:"addr"`
+	Type string     `yaml:"type"` // unused for now, should contain N3, N9, etc.
 }
 
 type DNN struct {
 	Dnn  string `yaml:"dnn"`
-	Cidr string `yaml:"cidr"` //TODO: netip.Prefix
+	Cidr string `yaml:"cidr"`
 }
