@@ -25,7 +25,7 @@ type Setup struct {
 
 func NewSetup(config *config.UpfConfig) *Setup {
 	opt := pfcp_networking.NewEntityOptions()
-	srv := pfcp_networking.NewPFCPEntityUPWithOptions(config.Pfcp.NodeID, config.Pfcp.Addr.String(), opt)
+	srv := pfcp_networking.NewPFCPEntityUPWithOptions(config.Pfcp.NodeID, config.Pfcp.Addr, opt)
 	return &Setup{
 		config:            config,
 		pfcpServer:        srv,
