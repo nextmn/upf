@@ -6,34 +6,29 @@
 package app
 
 import (
+	"context"
 	"time"
 
 	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 )
 
 type PFCPLogger struct {
-	srv  *pfcp_networking.PFCPEntityUP
-	stop chan bool
+	srv *pfcp_networking.PFCPEntityUP
 }
 
 func NewPFCPLogger(server *pfcp_networking.PFCPEntityUP) *PFCPLogger {
 	return &PFCPLogger{
-		srv:  server,
-		stop: make(chan bool, 1),
+		srv: server,
 	}
 }
 
-func (l *PFCPLogger) Run() {
+func (l *PFCPLogger) Run(ctx context.Context) error {
 	for {
 		select {
-		case <-l.stop:
-			return
+		case <-ctx.Done():
+			return ctx.Err()
 		case <-time.After(10 * time.Second):
 			l.srv.LogPFCPRules()
 		}
 	}
-}
-
-func (l *PFCPLogger) Exit() {
-	l.stop <- true
 }

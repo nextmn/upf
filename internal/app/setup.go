@@ -8,6 +8,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 	"github.com/nextmn/upf/internal/config"
@@ -51,6 +52,11 @@ func (s *Setup) Init(ctx context.Context) error {
 	}
 
 	go s.pfcpServer.ListenAndServeContext(ctx)
+	ctxTimeout, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	if err := s.pfcpServer.WaitReady(ctxTimeout); err != nil {
+		return err
+	}
 	if err := s.createTun(); err != nil {
 		return err
 	}
@@ -63,7 +69,7 @@ func (s *Setup) Init(ctx context.Context) error {
 	if err := s.createGTPUProtocolEntities(); err != nil {
 		return err
 	}
-	go s.logger.Run()
+	go s.logger.Run(ctx)
 	return nil
 }
 
@@ -79,8 +85,6 @@ func (s *Setup) Run(ctx context.Context) error {
 }
 
 func (s *Setup) Exit() error {
-	s.logger.Exit()
 	s.removeTun()
-	s.pfcpServer.Close()
 	return nil
 }
