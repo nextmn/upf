@@ -7,6 +7,7 @@ package app
 
 import (
 	"fmt"
+	"net/netip"
 	"strconv"
 
 	"github.com/nextmn/upf/internal/constants"
@@ -21,6 +22,10 @@ func (s *Setup) createTUNInterface() error {
 	if s.tunInterface == nil {
 		return fmt.Errorf("Tun interface has not been created")
 	}
+	var gtpEntity netip.Addr
+	if len(s.config.Gtpu.GTPUProtocolEntities) > 0 {
+		gtpEntity = s.config.Gtpu.GTPUProtocolEntities[0].Addr
+	}
 	go func() error {
 
 		for {
@@ -30,7 +35,7 @@ func (s *Setup) createTUNInterface() error {
 				return err
 			}
 			go func(packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) {
-				err := ipPacketHandler(packet, db, tuniface, pfcpServer)
+				err := ipPacketHandler(gtpEntity, packet, db, tuniface, pfcpServer)
 				if err != nil {
 					logrus.WithError(err).Debug("Drop packet")
 				}

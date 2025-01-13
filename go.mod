@@ -5,7 +5,7 @@ go 1.22.7
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/google/gopacket v1.1.19
-	github.com/nextmn/go-pfcp-networking v0.0.42-0.20250113143454-90776d0e392b
+	github.com/nextmn/go-pfcp-networking v0.0.42
 	github.com/nextmn/logrus-formatter v0.0.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8

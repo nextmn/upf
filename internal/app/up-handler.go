@@ -9,14 +9,16 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	pfcp_networking "github.com/nextmn/go-pfcp-networking/pfcp"
 	"github.com/nextmn/go-pfcp-networking/pfcp/api"
 	"github.com/nextmn/upf/internal/constants"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/sirupsen/logrus"
 	"github.com/songgao/water"
 	"github.com/songgao/water/waterutil"
@@ -55,7 +57,7 @@ func (db *FARAssociationDB) Get(seid uint64, farid uint32) *gtpv1.UPlaneConn {
 	return nil
 }
 
-func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
+func ipPacketHandler(gtpEntity netip.Addr, packet []byte, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
 	logrus.Debug("Received IP packet on TUN interface")
 	pfcpSession, err := pfcpSessionLookUp(false, 0, "", packet, pfcpServer)
 	if err != nil {
@@ -83,11 +85,11 @@ func ipPacketHandler(packet []byte, db *FARAssociationDB, tuniface *water.Interf
 		}
 		return err
 	}
-	handleIncommingPacket(db, packet, false, pfcpSession, pdr, tuniface)
+	handleIncommingPacket(gtpEntity, db, packet, false, pfcpSession, pdr, tuniface)
 	return nil
 }
 
-func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
+func tpduHandler(iface netip.Addr, c gtpv1.Conn, senderAddr net.Addr, msg message.Message, db *FARAssociationDB, tuniface *water.Interface, pfcpServer *pfcp_networking.PFCPEntityUP) error {
 	logrus.WithFields(logrus.Fields{
 		"sender":    senderAddr,
 		"teid":      msg.TEID(),
@@ -99,7 +101,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		logrus.WithError(err).Error("Could not marshal GTP packet")
 		return err
 	}
-	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface, packet, pfcpServer)
+	pfcpSession, err := pfcpSessionLookUp(true, msg.TEID(), iface.String(), packet, pfcpServer)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"teid":      msg.TEID(),
@@ -108,7 +110,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		return err
 	}
 	defer pfcpSession.RUnlock()
-	pdr, err := pfcpSessionPDRLookUp(pfcpSession, true, msg.TEID(), iface, packet)
+	pdr, err := pfcpSessionPDRLookUp(pfcpSession, true, msg.TEID(), iface.String(), packet)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"teid":      msg.TEID(),
@@ -121,7 +123,7 @@ func tpduHandler(iface string, c gtpv1.Conn, senderAddr net.Addr, msg message.Me
 		"teid":      msg.TEID(),
 		"interface": iface,
 	}).Debug("Found PDR associated on this packet")
-	handleIncommingPacket(db, packet, true, pfcpSession, pdr, tuniface)
+	handleIncommingPacket(iface, db, packet, true, pfcpSession, pdr, tuniface)
 	return nil
 }
 
@@ -199,7 +201,7 @@ func handleOuterHeaderRemoval(packet []byte, isGTP bool, outerHeaderRemoval *ie.
 	return packet, nil, nil
 }
 
-func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface, tuniface *water.Interface) error {
+func handleIncommingPacket(gtpIface netip.Addr, db *FARAssociationDB, packet []byte, isGTP bool, session api.PFCPSessionInterface, pdr api.PDRInterface, tuniface *water.Interface) error {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		pdrid, err := pdr.ID()
 		if err == nil {
@@ -271,6 +273,10 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 		default:
 			ipAddress = ""
 		}
+		netIpAddr, err := netip.ParseAddr(ipAddress)
+		if err != nil {
+			return err
+		}
 		switch {
 		case ohc.HasTEID(): // Outer Header Creation
 			// forward over GTP/UDP/IP
@@ -280,9 +286,9 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 			}
 			tlm, err := fp.TransportLevelMarking()
 			if err == nil {
-				return forwardGTP(gpdu, ipAddress, int(tlm>>8), session, farid, db)
+				return forwardGTP(gtpIface, gpdu, netIpAddr, int(tlm>>8), session, farid, db)
 			} else {
-				return forwardGTP(gpdu, ipAddress, 0, session, farid, db)
+				return forwardGTP(gtpIface, gpdu, netIpAddr, 0, session, farid, db)
 			}
 		case ohc.HasPortNumber():
 			// forward over UDP/IP
@@ -349,21 +355,8 @@ func handleIncommingPacket(db *FARAssociationDB, packet []byte, isGTP bool, sess
 
 }
 
-func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api.PFCPSessionInterface, farid uint32, db *FARAssociationDB) error {
-	if ipAddress == "" {
-		return fmt.Errorf("IP Address for GTP Forwarding is empty")
-	}
-	var udpaddr string
-	if strings.Count(ipAddress, ":") > 0 {
-		udpaddr = fmt.Sprintf("[%s]:%s", ipAddress, constants.GTPU_PORT)
-	} else {
-		udpaddr = fmt.Sprintf("%s:%s", ipAddress, constants.GTPU_PORT)
-	}
-	raddr, err := net.ResolveUDPAddr("udp", udpaddr)
-	if err != nil {
-		logrus.WithError(err).Error("Error while resolving UDP address of GTP-U Peer")
-		return err
-	}
+func forwardGTP(gtpIface netip.Addr, gpdu *message.Header, ipAddress netip.Addr, dscpecn int, session api.PFCPSessionInterface, farid uint32, db *FARAssociationDB) error {
+	raddr := net.UDPAddrFromAddrPort(netip.AddrPortFrom(ipAddress, constants.GTPU_PORT))
 	// Check Uconn exists for this FAR
 	seid, err := session.LocalSEID()
 	if err != nil {
@@ -376,12 +369,7 @@ func forwardGTP(gpdu *message.Header, ipAddress string, dscpecn int, session api
 		// For the GTP-U messages described below (other than the Echo Response message, see clause 4.4.2.2), the UDP Source
 		// Port or the Flow Label field (see IETF RFC 6437 [37]) should be set dynamically by the sending GTP-U entity to help
 		// balancing the load in the transport network.
-		c, err := net.Dial("udp", udpaddr)
-		if err != nil {
-			return err
-		}
-		c.Close()
-		laddr := c.LocalAddr().(*net.UDPAddr)
+		laddr := net.UDPAddrFromAddrPort(netip.AddrPortFrom(gtpIface, 0))
 		ch := make(chan bool)
 		go func(ch chan bool) error {
 			ctx, cancel := context.WithCancel(context.Background()) // FIXME: use context

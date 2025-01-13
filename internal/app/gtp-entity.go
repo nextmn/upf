@@ -33,7 +33,7 @@ func (s *Setup) createGtpUProtocolEntity(ipAddress netip.Addr) error {
 	defer cancel()
 	uConn.DisableErrorIndication()
 	uConn.AddHandler(message.MsgTypeTPDU, func(c gtpv1.Conn, senderAddr net.Addr, msg message.Message) error {
-		return tpduHandler(ipAddress.String(), c, senderAddr, msg, s.farUconnDb, s.tunInterface, s.pfcpServer)
+		return tpduHandler(ipAddress, c, senderAddr, msg, s.farUconnDb, s.tunInterface, s.pfcpServer)
 	})
 	if err := uConn.ListenAndServe(ctx); err != nil {
 		return err
